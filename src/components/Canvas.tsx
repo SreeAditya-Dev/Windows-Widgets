@@ -112,17 +112,17 @@ export const Canvas: React.FC = () => {
       )}
 
       {showAddButton && !editMode && !isGalleryOpen && (
-        <div className="fixed bottom-4 right-4 z-30 interactive-control opacity-40 hover:opacity-100 transition-opacity">
+        <div className="fixed bottom-6 right-6 z-30 interactive-control">
           <button
-            onClick={() => setEditMode(true)}
+            onClick={() => toggleGallery(true)}
             onContextMenu={e => {
               e.preventDefault();
               window.electronAPI?.openSettings();
             }}
-            title="Edit Widgets (right-click for Settings)"
-            className="w-9 h-9 rounded-full apple-glass-panel flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+            title="Add Widgets (right-click for Settings)"
+            className="w-11 h-11 rounded-full apple-glass-panel flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.45)] border border-white/25 hover:border-white/40 hover:scale-110 active:scale-95 transition-all text-white bg-black/40 hover:bg-black/60 backdrop-blur-xl"
           >
-            <Plus size={18} strokeWidth={2.2} />
+            <Plus size={20} strokeWidth={2.5} className="drop-shadow" />
           </button>
         </div>
       )}

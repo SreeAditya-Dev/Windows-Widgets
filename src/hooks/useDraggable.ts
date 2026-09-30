@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useWidgetStore } from './useWidgetStore';
-import { findFreeSpot, clampToBounds } from '../lib/layout';
+import { findFreeSpot, clampToBounds, getEdgeMargin } from '../lib/layout';
 import { WidgetSize } from '../types/widget';
 
 interface DragOptions {
@@ -83,9 +83,13 @@ export function useDraggable({ id, x, y, size, width, height, disabled = false }
           setDragActive(id);
           document.body.style.cursor = 'grabbing';
         }
+        const { settings } = useWidgetStore.getState();
+        const grid = settings.snapToGrid ? settings.gridSize : 1;
+        const margin = getEdgeMargin({ width: window.innerWidth, height: window.innerHeight }, grid);
         const next = clampToBounds(
           { x: originX + dx, y: originY + dy, width: dims.current.width, height: dims.current.height },
-          { width: window.innerWidth, height: window.innerHeight }
+          { width: window.innerWidth, height: window.innerHeight },
+          margin
         );
         live.current = next;
         setPos(next);

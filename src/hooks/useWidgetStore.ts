@@ -10,7 +10,7 @@ import {
   WIDGET_DIMENSIONS
 } from '../types/widget';
 import { WIDGET_META, defaultSettingsFor } from '../widgets/defaults';
-import { findFreeSpot, firstFreeSlot, clampToBounds } from '../lib/layout';
+import { findFreeSpot, firstFreeSlot, clampToBounds, getEdgeMargin } from '../lib/layout';
 
 interface ContextMenuState {
   isOpen: boolean;
@@ -76,11 +76,17 @@ const screenBounds = () =>
     ? { width: window.screen.availWidth, height: window.screen.availHeight }
     : { width: window.innerWidth, height: window.innerHeight };
 
-const layoutOpts = (s: AppSettings) => ({
-  gap: s.spacing,
-  grid: s.snapToGrid ? s.gridSize : 1,
-  bounds: screenBounds()
-});
+const layoutOpts = (s: AppSettings) => {
+  const bounds = screenBounds();
+  const grid = s.snapToGrid ? s.gridSize : 1;
+  const margin = getEdgeMargin(bounds, grid);
+  return {
+    gap: s.spacing,
+    grid,
+    bounds,
+    margin
+  };
+};
 
 export const useWidgetStore = create<WidgetStore>((set, get) => ({
   loaded: false,
@@ -99,18 +105,32 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     }
     const config = await api.loadConfig();
     if (config) {
+      const loadedSettings = { ...DEFAULT_SETTINGS, ...(config.settings || {}) };
+      const bounds = screenBounds();
+      const grid = loadedSettings.snapToGrid ? loadedSettings.gridSize : 1;
+      const margin = getEdgeMargin(bounds, grid);
+      const widgets = (config.widgets || []).map(w =>
+        w.position.x < margin ? { ...w, position: { ...w.position, x: margin } } : w
+      );
       set({
-        widgets: config.widgets || [],
-        settings: { ...DEFAULT_SETTINGS, ...(config.settings || {}) }
+        widgets,
+        settings: loadedSettings
       });
     }
     set({ loaded: true });
 
     // Another window (Settings) changed the config
     api.onConfigUpdated(cfg => {
+      const loadedSettings = { ...DEFAULT_SETTINGS, ...(cfg.settings || {}) };
+      const bounds = screenBounds();
+      const grid = loadedSettings.snapToGrid ? loadedSettings.gridSize : 1;
+      const margin = getEdgeMargin(bounds, grid);
+      const widgets = (cfg.widgets || []).map(w =>
+        w.position.x < margin ? { ...w, position: { ...w.position, x: margin } } : w
+      );
       set({
-        widgets: cfg.widgets || [],
-        settings: { ...DEFAULT_SETTINGS, ...(cfg.settings || {}) }
+        widgets,
+        settings: loadedSettings
       });
     });
 
@@ -130,8 +150,12 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   },
 
   updatePosition: (id, x, y) => {
+    const bounds = screenBounds();
+    const grid = get().settings.snapToGrid ? get().settings.gridSize : 1;
+    const margin = getEdgeMargin(bounds, grid);
+    const safeX = Math.max(margin, x);
     set(state => ({
-      widgets: state.widgets.map(w => (w.id === id ? { ...w, position: { x, y } } : w))
+      widgets: state.widgets.map(w => (w.id === id ? { ...w, position: { x: safeX, y } } : w))
     }));
     persist(get, { widgets: true });
   },
@@ -142,8 +166,9 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       if (!target) return state;
       const others = state.widgets.filter(w => w.id !== id);
       const d = WIDGET_DIMENSIONS[size];
-      const clamped = clampToBounds({ ...target.position, ...d }, screenBounds());
-      const position = findFreeSpot(clamped, size, others, layoutOpts(state.settings));
+      const opts = layoutOpts(state.settings);
+      const clamped = clampToBounds({ ...target.position, ...d }, opts.bounds, opts.margin);
+      const position = findFreeSpot(clamped, size, others, opts);
       return {
         widgets: state.widgets.map(w => (w.id === id ? { ...w, size, position } : w))
       };
