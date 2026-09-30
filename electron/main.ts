@@ -24,6 +24,11 @@ let store: ConfigStore | null = null;
 let overlayActive = false;
 let stopGuard: (() => void) | null = null;
 
+// Keep settings in the same folder for the dev build and the installed app
+// (the installed app is named "Desktop Widgets", which would otherwise start a fresh config)
+app.setPath('userData', path.join(app.getPath('appData'), 'mac-widgets-windows'));
+if (process.platform === 'win32') app.setAppUserModelId('com.sreeaditya.desktopwidgets');
+
 // Prevent multiple instances: running it again opens Settings
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -124,6 +129,7 @@ function openSettings(section?: string) {
     minHeight: 520,
     show: false,
     title: 'Widget Settings',
+    icon: appIconPath(),
     titleBarStyle: 'hidden',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e20' : '#f5f5f7',
     autoHideMenuBar: true,
@@ -213,11 +219,9 @@ function readSystemStats(): SystemStats {
 function ensureStartMenuShortcuts() {
   if (process.platform !== 'win32') return;
   try {
-    const dir = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Desktop Widgets');
-    fs.mkdirSync(dir, { recursive: true });
-    const baseArgs = app.isPackaged ? '' : `"${app.getAppPath()}"`;
-    const make = (name: string, extraArgs: string, description: string) => {
-      const file = path.join(dir, `${name}.lnk`);
+    const programs = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+    const make = (file: string, extraArgs: string, description: string) => {
+      const baseArgs = app.isPackaged ? '' : `"${app.getAppPath()}"`;
       // 'replace' only works on an existing shortcut; 'create' only on a new one
       return shell.writeShortcutLink(file, fs.existsSync(file) ? 'replace' : 'create', {
         target: process.execPath,
@@ -225,14 +229,29 @@ function ensureStartMenuShortcuts() {
         cwd: app.isPackaged ? path.dirname(process.execPath) : app.getAppPath(),
         description,
         icon: process.execPath,
-        iconIndex: 0
+        iconIndex: 0,
+        appUserModelId: 'com.sreeaditya.desktopwidgets'
       });
     };
-    make('Desktop Widgets', '', 'macOS-style desktop widgets');
-    make('Widget Settings', '--settings', 'Customise your desktop widgets');
+
+    const devDir = path.join(programs, 'Desktop Widgets');
+    if (app.isPackaged) {
+      // The installer already adds "Desktop Widgets"; add a direct Settings entry next to it
+      // and remove the developer shortcuts that pointed at electron.exe
+      if (fs.existsSync(devDir)) fs.rmSync(devDir, { recursive: true, force: true });
+      make(path.join(programs, 'Widget Settings.lnk'), '--settings', 'Customise your desktop widgets');
+    } else {
+      fs.mkdirSync(devDir, { recursive: true });
+      make(path.join(devDir, 'Desktop Widgets.lnk'), '', 'macOS-style desktop widgets');
+      make(path.join(devDir, 'Widget Settings.lnk'), '--settings', 'Customise your desktop widgets');
+    }
   } catch (e) {
     console.error('[Main] Could not create Start menu shortcuts:', e);
   }
+}
+
+function appIconPath() {
+  return path.join(__dirname, '../dist/icon.png');
 }
 
 // ==========================================
@@ -240,6 +259,9 @@ function ensureStartMenuShortcuts() {
 // ==========================================
 app.whenReady().then(() => {
   store = new ConfigStore();
+  if (app.isPackaged && !settings().installedSetupDone) {
+    store.save({ settings: { ...settings(), autoStart: true, installedSetupDone: true } });
+  }
   applyLoginItem(settings().autoStart);
 
   widgetWindow = createWidgetWindow();
@@ -256,7 +278,7 @@ app.whenReady().then(() => {
       broadcastConfig(null);
     }
   };
-  setupTray(trayActions);
+  setupTray(trayActions, appIconPath());
 
   function broadcastConfig(sender: Electron.WebContents | null) {
     const cfg = store!.getConfig();

@@ -87,7 +87,7 @@ export const PhotosWidget: React.FC<WidgetProps<PhotosSettings>> = ({ settings, 
   return (
     <div
       onClick={handleNextPhoto}
-      className="relative w-full h-full overflow-hidden select-none group/photo bg-black"
+      className="relative w-full h-full overflow-hidden select-none group/photo"
     >
       {/* Photo with Ken Burns pan & zoom effect */}
       <div
@@ -95,6 +95,8 @@ export const PhotosWidget: React.FC<WidgetProps<PhotosSettings>> = ({ settings, 
         className="absolute inset-0 bg-cover bg-center animate-fade-in"
         style={{
           backgroundImage: `url("${currentPhotoUrl}")`,
+          backgroundColor: '#1c1c1e',
+          backfaceVisibility: 'hidden',
           animation: settings?.effect === 'static' ? undefined : 'kenburns 30s ease-in-out infinite alternate'
         }}
       />

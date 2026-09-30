@@ -14,8 +14,11 @@ export interface TrayActions {
 const ICON_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZ0lEQVR42mNkQAaMjIx/oXxmBiIBo2oGlAYGBgYWBgaG/0D8H4s4iDYC0c/wKWBmwKYAJgY2oBkMYGPYFdCEkR3AgM0gFEeQHYxLM4zN/wEZjmwANoMRDkZ10MAHQHEKikO4HE2sAAB9fQ4vjQ/5twAAAABJRU5ErkJggg==';
 
-export function setupTray(actions: TrayActions): Tray {
-  tray = new Tray(nativeImage.createFromBuffer(Buffer.from(ICON_BASE64, 'base64')));
+export function setupTray(actions: TrayActions, iconPath?: string): Tray {
+  let icon = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+  if (icon.isEmpty()) icon = nativeImage.createFromBuffer(Buffer.from(ICON_BASE64, 'base64'));
+  else icon = icon.resize({ width: 16, height: 16, quality: 'best' });
+  tray = new Tray(icon);
   tray.setToolTip('Desktop Widgets');
   refreshTray(actions);
 

@@ -69,6 +69,12 @@
     0 6px 14px rgba(0, 0, 0, 0.2);
   z-index: 40;
 }
+/* Full-bleed photos: the drop shadow renders as dark, unrounded blocks at the bottom
+   corners of the transparent window (worst while Ken Burns animates), so drop it. */
+.widget-shell.full-bleed,
+.widget-shell.full-bleed.is-dragging {
+  box-shadow: none;
+}
 .widget-shell.is-entering {
   animation: widgetIn 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15);
 }

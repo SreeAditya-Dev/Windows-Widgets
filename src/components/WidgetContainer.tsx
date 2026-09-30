@@ -82,7 +82,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({ widget, scheme
           cursor: isDragging ? 'grabbing' : undefined,
           touchAction: 'none'
         }}
-        className={`widget-shell ${surfaceClass} ${isDragging ? 'is-dragging' : 'z-10'} ${entering ? 'is-entering' : ''} ${
+        className={`widget-shell ${surfaceClass} ${isDragging ? 'is-dragging' : 'z-10'} ${entering ? 'is-entering' : ''} ${meta.fullBleed ? 'full-bleed' : ''} ${
           editMode ? 'edit-mode' : ''
         }`}
       >

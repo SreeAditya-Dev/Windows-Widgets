@@ -332,11 +332,7 @@ export const SettingsApp: React.FC = () => {
       case 'about':
         return (
           <div className="flex flex-col items-center text-center pt-8">
-            <div className="grid grid-cols-2 gap-1.5 p-2.5 rounded-[22px] bg-gradient-to-br from-[#5ac8fa] to-[#5856d6] shadow-xl mb-4">
-              {['#fff', '#ffffffcc', '#ffffffcc', '#fff'].map((c, i) => (
-                <div key={i} className="w-8 h-8 rounded-lg" style={{ background: c }} />
-              ))}
-            </div>
+            <img src={`${import.meta.env.BASE_URL}icon.png`} alt="" className="w-24 h-24 mb-4 drop-shadow-xl" draggable={false} />
             <div className="text-[22px] font-bold">Desktop Widgets</div>
             <div className="text-[12px] text-ink/50 mb-5">Version 2.0 · macOS-style widgets for Windows</div>
             <Group>

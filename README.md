@@ -39,12 +39,21 @@ The widget layer is one transparent, click-through window marked `WS_EX_TOOLWIND
 
 Rainmeter uses the same technique for its "On Desktop" setting.
 
-## Run
+## Install (recommended)
+
+1. Run `npm run dist` once. It builds `release/Desktop-Widgets-Setup-2.0.0.exe`.
+2. Double-click the installer.
+3. The installer adds **Desktop Widgets** to the Start menu and the desktop, then starts it.
+
+The first time the installed app runs, it turns on **start with Windows**, so the widgets are always there. You can switch this off in Settings → General. There's also a **Widget Settings** entry in the Start menu that opens Settings directly.
+
+## Develop
 
 ```bash
 npm install
-npm run build   # type-check + build renderer and main process
-npm start       # or double-click start-widgets.vbs for a silent start
+npm run dev     # hot-reload development
+npm run build   # type-check + build
+npm start       # run the built app without installing
 ```
 
-For development, run `npm run dev`. Settings are stored in `%APPDATA%\mac-widgets-windows\widgets-config.json`.
+Settings are stored in `%APPDATA%\mac-widgets-windows\widgets-config.json`. The dev build and the installed app share this file.

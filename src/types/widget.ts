@@ -120,6 +120,8 @@ export interface AppSettings {
   /** Float widgets above every window */
   alwaysOnTop: boolean;
   showAddButton: boolean;
+  /** Set after the installed app's first launch (turns on start-with-Windows once) */
+  installedSetupDone?: boolean;
 }
 
 export interface StoredConfig {
