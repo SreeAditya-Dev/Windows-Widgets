@@ -86,7 +86,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({ widget, scheme
           editMode ? 'edit-mode' : ''
         }`}
       >
-        <div className={`widget-clip ${surfaceClass}`}>
+        <div className={`widget-clip ${surfaceClass} ${meta.fullBleed ? 'full-bleed' : ''}`}>
           {!meta.fullBleed && <div className="widget-bg" style={{ opacity }} />}
           <Comp id={widget.id} size={size} settings={settings} onSettings={onSettings} />
         </div>

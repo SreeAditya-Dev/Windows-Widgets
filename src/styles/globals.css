@@ -109,9 +109,13 @@
   border-radius: inherit;
   pointer-events: none;
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   z-index: 5;
+}
+/* Photos / weather fill the whole widget edge-to-edge, like macOS: no hairline frame */
+.widget-clip.full-bleed::after {
+  box-shadow: none;
 }
 .scheme-light .widget-clip::after,
 .widget-clip.scheme-light::after {
