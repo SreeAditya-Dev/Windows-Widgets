@@ -87,22 +87,38 @@ export const PhotosWidget: React.FC<WidgetProps<PhotosSettings>> = ({ settings, 
   return (
     <div
       onClick={handleNextPhoto}
-      className="relative w-full h-full overflow-hidden select-none group/photo"
+      className="relative w-full h-full select-none group/photo"
+      style={{ borderRadius: 'var(--radius)' }}
     >
-      {/* Photo with Ken Burns pan & zoom effect */}
+      {/* Rounded, masked frame: the animated photo and the scrim can never spill past the corners.
+          The radial-gradient mask forces Chromium to clip composited (animated) children exactly. */}
       <div
-        key={currentPhotoUrl}
-        className="absolute inset-0 bg-cover bg-center animate-fade-in"
+        className="absolute inset-0 overflow-hidden"
         style={{
-          backgroundImage: `url("${currentPhotoUrl}")`,
-          backgroundColor: '#1c1c1e',
-          backfaceVisibility: 'hidden',
-          animation: settings?.effect === 'static' ? undefined : 'kenburns 30s ease-in-out infinite alternate'
+          borderRadius: 'var(--radius)',
+          WebkitMaskImage: '-webkit-radial-gradient(white, black)',
+          transform: 'translateZ(0)',
+          isolation: 'isolate'
         }}
-      />
+      >
+        {/* Photo with Ken Burns pan & zoom effect */}
+        <div
+          key={currentPhotoUrl}
+          className="absolute inset-0 bg-cover bg-center animate-fade-in"
+          style={{
+            backgroundImage: `url("${currentPhotoUrl}")`,
+            backgroundColor: '#1c1c1e',
+            backfaceVisibility: 'hidden',
+            animation: settings?.effect === 'static' ? undefined : 'kenburns 30s ease-in-out infinite alternate'
+          }}
+        />
 
-      {/* Subtle Apple gradient shadow scrim at bottom for text contrast */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
+        {/* Subtle Apple gradient shadow scrim at bottom for text contrast */}
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none"
+          style={{ borderRadius: 'var(--radius)' }}
+        />
+      </div>
 
       {/* Top right folder picker button (appears on hover) */}
       <button
