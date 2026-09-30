@@ -171,7 +171,7 @@ export function startDesktopGuard(win: BrowserWindow, getOptions: () => DesktopG
       }
 
       // Re-apply bottom whenever focus moves, because activating our own window raises it
-      if (want !== applied || (want === 'bottom' && fgChanged)) {
+      if (want !== applied || want === 'bottom') {
         apply(want);
       }
     } catch (err) {
