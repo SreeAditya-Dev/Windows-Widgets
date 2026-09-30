@@ -62,6 +62,51 @@ if (process.platform === 'win32') {
   }
 }
 
+// Foreground-change notifications, so the guard reacts the instant an app is activated
+// instead of waiting for the next poll (which let widgets flash over the app)
+const EVENT_SYSTEM_FOREGROUND = 0x0003;
+const EVENT_SYSTEM_MINIMIZEEND = 0x0017;
+const WINEVENT_OUTOFCONTEXT = 0x0000;
+
+let hookApi: {
+  proto: koffi.IKoffiCType;
+  SetWinEventHook: (min: number, max: number, mod: number, fn: unknown, pid: number, tid: number, flags: number) => number;
+  UnhookWinEvent: (hook: number) => boolean;
+} | null = null;
+
+if (api) {
+  try {
+    const user32 = koffi.load('user32.dll');
+    const proto = koffi.proto(
+      'void __stdcall WinEventProc(intptr_t hook, uint32_t event, intptr_t hwnd, int32_t idObject, int32_t idChild, uint32_t thread, uint32_t time)'
+    );
+    hookApi = {
+      proto,
+      SetWinEventHook: user32.func('SetWinEventHook', 'intptr_t', ['uint32_t', 'uint32_t', 'intptr_t', koffi.pointer(proto), 'uint32_t', 'uint32_t', 'uint32_t']),
+      UnhookWinEvent: user32.func('UnhookWinEvent', 'bool', ['intptr_t'])
+    };
+  } catch (err) {
+    console.warn('[Win32] WinEvent hook unavailable, falling back to polling only:', err);
+  }
+}
+
+/** Calls `onChange` whenever the foreground window changes. Returns an unhook function. */
+function watchForeground(onChange: () => void): () => void {
+  if (!hookApi) return () => {};
+  const h = hookApi;
+  try {
+    const cb = koffi.register(() => onChange(), koffi.pointer(h.proto));
+    const hook = h.SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MINIMIZEEND, 0, cb, 0, 0, WINEVENT_OUTOFCONTEXT);
+    return () => {
+      if (hook) h.UnhookWinEvent(hook);
+      koffi.unregister(cb);
+    };
+  } catch (err) {
+    console.warn('[Win32] Failed to install foreground hook:', err);
+    return () => {};
+  }
+}
+
 /**
  * Extracts the HWND from an Electron BrowserWindow handle Buffer as a number
  */
@@ -264,6 +309,10 @@ export function startDesktopGuard(
   };
 
   tick();
+  const unhook = watchForeground(tick);
   const timer = setInterval(tick, 120);
-  return () => clearInterval(timer);
+  return () => {
+    clearInterval(timer);
+    unhook();
+  };
 }
