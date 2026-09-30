@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useWidgetStore } from '../hooks/useWidgetStore';
 import { SIZE_LABELS } from '../types/widget';
 import { WIDGET_META, TINT_SWATCHES } from '../widgets/defaults';
-import { Trash2, Lock, Unlock, Layers, Check, Settings, SquarePen, FolderOpen } from 'lucide-react';
+import { Trash2, Lock, Unlock, Layers, Check, Settings, SquarePen, FolderOpen, SplitSquareVertical, SlidersHorizontal } from 'lucide-react';
 
 const Item: React.FC<{
   icon?: React.ReactNode;
@@ -33,6 +33,7 @@ export const ContextMenu: React.FC = () => {
   const updateWidget = useWidgetStore(s => s.updateWidget);
   const removeWidget = useWidgetStore(s => s.removeWidget);
   const createStack = useWidgetStore(s => s.createStack);
+  const splitStack = useWidgetStore(s => s.splitStack);
   const setWidgetLocked = useWidgetStore(s => s.setWidgetLocked);
   const setEditMode = useWidgetStore(s => s.setEditMode);
   const updateSettings = useWidgetStore(s => s.updateSettings);
@@ -119,7 +120,11 @@ export const ContextMenu: React.FC = () => {
       <Item icon={<SquarePen size={13} />} onClick={run(() => setEditMode(true))}>
         Edit Widgets
       </Item>
-      {widget.type !== 'smart-stack' && (
+      {widget.type === 'smart-stack' ? (
+        <Item icon={<SplitSquareVertical size={13} />} onClick={run(() => splitStack(widget.id))}>
+          Split into Separate Widgets
+        </Item>
+      ) : (
         <Item icon={<Layers size={13} />} onClick={run(() => createStack(widget.id))}>
           Make Smart Stack
         </Item>
@@ -131,6 +136,10 @@ export const ContextMenu: React.FC = () => {
         {widget.isLocked ? 'Unlock Position' : 'Lock Position'}
       </Item>
 
+      <Sep />
+      <Item icon={<SlidersHorizontal size={13} />} onClick={run(() => window.electronAPI?.openSettings())}>
+        Widget Settings…
+      </Item>
       <Sep />
       <Item danger icon={<Trash2 size={13} />} onClick={run(() => removeWidget(widget.id))}>
         Remove Widget

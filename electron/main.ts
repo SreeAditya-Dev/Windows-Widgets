@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain, dialog, nativeTheme } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, dialog, nativeTheme, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -31,7 +31,10 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
+// Launching again (e.g. the "Widget Settings" Start-menu shortcut) opens Settings
 app.on('second-instance', () => openSettings());
+
+const wantsSettingsOnLaunch = process.argv.includes('--settings');
 
 const rendererEntry = (win: BrowserWindow, hash?: string) => {
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -203,6 +206,35 @@ function readSystemStats(): SystemStats {
   return stats;
 }
 
+/**
+ * Start-menu entries so Settings can be opened like a normal app:
+ *   Start ▸ Desktop Widgets ▸ Desktop Widgets / Widget Settings
+ */
+function ensureStartMenuShortcuts() {
+  if (process.platform !== 'win32') return;
+  try {
+    const dir = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Desktop Widgets');
+    fs.mkdirSync(dir, { recursive: true });
+    const baseArgs = app.isPackaged ? '' : `"${app.getAppPath()}"`;
+    const make = (name: string, extraArgs: string, description: string) => {
+      const file = path.join(dir, `${name}.lnk`);
+      // 'replace' only works on an existing shortcut; 'create' only on a new one
+      return shell.writeShortcutLink(file, fs.existsSync(file) ? 'replace' : 'create', {
+        target: process.execPath,
+        args: [baseArgs, extraArgs].filter(Boolean).join(' '),
+        cwd: app.isPackaged ? path.dirname(process.execPath) : app.getAppPath(),
+        description,
+        icon: process.execPath,
+        iconIndex: 0
+      });
+    };
+    make('Desktop Widgets', '', 'macOS-style desktop widgets');
+    make('Widget Settings', '--settings', 'Customise your desktop widgets');
+  } catch (e) {
+    console.error('[Main] Could not create Start menu shortcuts:', e);
+  }
+}
+
 // ==========================================
 // 5. App lifecycle
 // ==========================================
@@ -211,6 +243,8 @@ app.whenReady().then(() => {
   applyLoginItem(settings().autoStart);
 
   widgetWindow = createWidgetWindow();
+  ensureStartMenuShortcuts();
+  if (wantsSettingsOnLaunch) widgetWindow.once('ready-to-show', () => openSettings());
 
   const trayActions: TrayActions = {
     onAddWidgets: () => sendCommand({ type: 'toggle-gallery', value: true }),

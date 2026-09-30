@@ -3,7 +3,7 @@ import { useWidgetStore } from '../hooks/useWidgetStore';
 import { useResolvedScheme, useRootVars } from '../hooks/useAppearance';
 import { WIDGET_META, ACCENT_SWATCHES } from '../widgets/defaults';
 import { WIDGET_ICONS } from '../widgets/registry';
-import { SIZE_LABELS, WidgetStyle, ThemeMode } from '../types/widget';
+import { SIZE_LABELS, WidgetStyle, ThemeMode, WidgetType } from '../types/widget';
 import { WidgetPreview } from '../components/WidgetPreview';
 import { WidgetEditor } from './WidgetEditor';
 import { Group, Row, Switch, Slider, Swatches, Button } from './controls';
@@ -44,6 +44,9 @@ export const SettingsApp: React.FC = () => {
   const settings = useWidgetStore(s => s.settings);
   const widgets = useWidgetStore(s => s.widgets);
   const setSettings = useWidgetStore(s => s.setSettings);
+  const splitStack = useWidgetStore(s => s.splitStack);
+  const stackWidgets = useWidgetStore(s => s.stackWidgets);
+  const [picked, setPicked] = useState<string[]>([]);
   const scheme = useResolvedScheme();
   const rootVars = useRootVars();
 
@@ -262,24 +265,67 @@ export const SettingsApp: React.FC = () => {
           <>
             <Group
               title={`On your desktop (${widgets.length})`}
-              footer="Tip: right-click a widget on the desktop and choose “Edit” to jump straight here."
+              footer="Tick two or more widgets to combine them into one Smart Stack. A Smart Stack can be split back into separate widgets at any time."
             >
               {widgets.length === 0 && <Row label="No widgets yet" hint="Add some from the widget gallery." />}
-              {widgets.map(w => (
-                <button key={w.id} onClick={() => setSelectedId(w.id)} className="w-full text-left hover:bg-ink/[0.04]">
-                  <Row label={<span className="flex items-center gap-2.5"><span className="text-[17px]">{WIDGET_ICONS[w.type]}</span>{WIDGET_META[w.type]?.title || w.type}</span>}>
-                    <span className="text-[12px] text-ink/50">
-                      {SIZE_LABELS[w.size]}
-                      {w.isLocked ? ' · Locked' : ''}
-                    </span>
-                    <span className="text-ink/30">›</span>
-                  </Row>
-                </button>
-              ))}
+              {widgets.map(w => {
+                const isStack = w.type === 'smart-stack';
+                const inside = isStack ? (w.settings?.items || []).map((i: { type: WidgetType }) => WIDGET_META[i.type]?.title).join(' + ') : '';
+                return (
+                  <div key={w.id} className="flex items-center hover:bg-ink/[0.04]">
+                    <div className="pl-3.5">
+                      {isStack ? (
+                        <span className="block w-4" />
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={picked.includes(w.id)}
+                          onChange={e => setPicked(p => (e.target.checked ? [...p, w.id] : p.filter(x => x !== w.id)))}
+                          className="w-4 h-4 accent-[rgb(var(--accent-rgb))] cursor-pointer"
+                          title="Select to combine into a Smart Stack"
+                        />
+                      )}
+                    </div>
+                    <button onClick={() => setSelectedId(w.id)} className="flex-1 text-left min-w-0">
+                      <Row
+                        label={
+                          <span className="flex items-center gap-2.5">
+                            <span className="text-[17px]">{WIDGET_ICONS[w.type]}</span>
+                            {WIDGET_META[w.type]?.title || w.type}
+                          </span>
+                        }
+                        hint={isStack ? inside : undefined}
+                      >
+                        <span className="text-[12px] text-ink/50">
+                          {SIZE_LABELS[w.size]}
+                          {w.isLocked ? ' · Locked' : ''}
+                        </span>
+                        <span className="text-ink/30">›</span>
+                      </Row>
+                    </button>
+                    {isStack && (
+                      <div className="pr-3.5">
+                        <Button onClick={() => splitStack(w.id)}>Split</Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </Group>
-            <Button kind="primary" onClick={() => cmd?.({ type: 'toggle-gallery', value: true })}>
-              Add Widgets…
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button kind="primary" onClick={() => cmd?.({ type: 'toggle-gallery', value: true })}>
+                Add Widgets…
+              </Button>
+              <Button
+                onClick={() => {
+                  if (picked.length < 2) return;
+                  stackWidgets(picked);
+                  setPicked([]);
+                }}
+              >
+                {picked.length >= 2 ? `Combine ${picked.length} into Smart Stack` : 'Combine into Smart Stack (tick 2+)'}
+              </Button>
+            </div>
           </>
         );
 

@@ -89,6 +89,9 @@
   border-radius: var(--radius);
   overflow: hidden;
   isolation: isolate;
+  /* Animated photos (Ken Burns) run on their own GPU layer, which border-radius
+     alone doesn't always clip in a transparent window — clip-path always does. */
+  clip-path: inset(0 round var(--radius));
 }
 
 .widget-bg {

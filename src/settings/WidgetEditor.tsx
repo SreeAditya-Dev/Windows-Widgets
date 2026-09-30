@@ -74,6 +74,8 @@ export const WidgetEditor: React.FC<{ widget: WidgetInstance; style: string }> =
   const updateWidget = useWidgetStore(s => s.updateWidget);
   const updateSize = useWidgetStore(s => s.updateSize);
   const removeWidget = useWidgetStore(s => s.removeWidget);
+  const splitStack = useWidgetStore(s => s.splitStack);
+  const unstackItem = useWidgetStore(s => s.unstackItem);
   const meta = WIDGET_META[widget.type];
   const s = useMemo(() => ({ ...defaultSettingsFor(widget.type), ...(widget.settings || {}) }), [widget.type, widget.settings]);
   const set = (patch: Record<string, any>) => updateSettings(widget.id, patch);
@@ -234,10 +236,17 @@ export const WidgetEditor: React.FC<{ widget: WidgetInstance; style: string }> =
 
       {widget.type === 'smart-stack' && (
         <Group title="Smart Stack" footer="Scroll over the stack on your desktop to flip between widgets.">
+          <Row label="Keep these widgets separate instead" hint="Puts every widget in this stack on the desktop on its own.">
+            <Button kind="primary" onClick={() => splitStack(widget.id)}>
+              Split into Separate Widgets
+            </Button>
+          </Row>
           {(s.items as SmartStackItem[]).map((it, i) => (
             <Row key={it.id} label={`${i + 1}. ${WIDGET_META[it.type].title}`}>
+              <Button onClick={() => unstackItem(widget.id, it.id)}>Move Out</Button>
               <button
                 disabled={s.items.length <= 1}
+                title="Remove from stack"
                 onClick={() => set({ items: s.items.filter((x: SmartStackItem) => x.id !== it.id), currentIndex: 0 })}
                 className="text-ink/40 hover:text-[#FF3B30] disabled:opacity-30"
               >

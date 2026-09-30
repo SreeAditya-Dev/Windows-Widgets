@@ -5,6 +5,7 @@ import {
   WidgetSize,
   WidgetType,
   StoredConfig,
+  SmartStackItem,
   DEFAULT_SETTINGS,
   WIDGET_DIMENSIONS
 } from '../types/widget';
@@ -36,6 +37,12 @@ interface WidgetStore {
   addWidget: (type: WidgetType, size?: WidgetSize) => void;
   removeWidget: (id: string) => void;
   createStack: (widgetId: string) => void;
+  /** Break a Smart Stack apart into separate widgets */
+  splitStack: (stackId: string) => void;
+  /** Move one widget out of a Smart Stack onto the desktop */
+  unstackItem: (stackId: string, itemId: string) => void;
+  /** Combine several separate widgets into one Smart Stack */
+  stackWidgets: (ids: string[]) => void;
   toggleGallery: (open?: boolean) => void;
   setEditMode: (on: boolean) => void;
   openContextMenu: (widgetId: string, x: number, y: number) => void;
@@ -211,6 +218,99 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
         }
       };
       return { widgets: state.widgets.map(w => (w.id === widgetId ? stackWidget : w)) };
+    });
+    persist(get, { widgets: true });
+  },
+
+  splitStack: stackId => {
+    set(state => {
+      const stack = state.widgets.find(w => w.id === stackId);
+      if (!stack || stack.type !== 'smart-stack') return state;
+      const items: SmartStackItem[] = stack.settings?.items || [];
+      const rest = state.widgets.filter(w => w.id !== stackId);
+      const placed: WidgetInstance[] = [];
+      const now = Date.now();
+      items.forEach((it, i) => {
+        const meta = WIDGET_META[it.type];
+        if (!meta) return;
+        const size = meta.sizes.includes(stack.size) ? stack.size : meta.defaultSize;
+        const position = findFreeSpot(stack.position, size, [...rest, ...placed], layoutOpts(state.settings));
+        placed.push({
+          id: `${it.type}-${now + i}`,
+          type: it.type,
+          size,
+          position,
+          isLocked: false,
+          tint: meta.tint,
+          settings: { ...defaultSettingsFor(it.type), ...(it.settings || {}) }
+        });
+      });
+      return { widgets: [...rest, ...placed] };
+    });
+    persist(get, { widgets: true });
+  },
+
+  unstackItem: (stackId, itemId) => {
+    const stack = get().widgets.find(w => w.id === stackId);
+    const items: SmartStackItem[] = stack?.settings?.items || [];
+    const item = items.find(i => i.id === itemId);
+    if (!stack || !item) return;
+    if (items.length <= 2) {
+      // A stack of one isn't a stack – split it completely
+      get().splitStack(stackId);
+      return;
+    }
+    set(state => {
+      const meta = WIDGET_META[item.type];
+      const size = meta.sizes.includes(stack.size) ? stack.size : meta.defaultSize;
+      const position = findFreeSpot(stack.position, size, state.widgets, layoutOpts(state.settings));
+      const remaining = items.filter(i => i.id !== itemId);
+      const widgets = state.widgets.map(w =>
+        w.id === stackId ? { ...w, settings: { ...w.settings, items: remaining, currentIndex: 0 } } : w
+      );
+      widgets.push({
+        id: `${item.type}-${Date.now()}`,
+        type: item.type,
+        size,
+        position,
+        isLocked: false,
+        tint: meta.tint,
+        settings: { ...defaultSettingsFor(item.type), ...(item.settings || {}) }
+      });
+      return { widgets };
+    });
+    persist(get, { widgets: true });
+  },
+
+  stackWidgets: ids => {
+    set(state => {
+      const chosen = ids
+        .map(id => state.widgets.find(w => w.id === id))
+        .filter((w): w is WidgetInstance => !!w && w.type !== 'smart-stack');
+      if (chosen.length < 2) return state;
+      const first = chosen[0];
+      const now = Date.now();
+      const stack: WidgetInstance = {
+        id: `smart-stack-${now}`,
+        type: 'smart-stack',
+        size: WIDGET_META['smart-stack'].sizes.includes(first.size) ? first.size : 'small',
+        position: first.position,
+        isLocked: first.isLocked,
+        tint: first.tint,
+        settings: {
+          items: chosen.map((w, i) => ({
+            id: `item-${now}-${i}`,
+            type: w.type as Exclude<WidgetType, 'smart-stack'>,
+            title: WIDGET_META[w.type].title,
+            settings: w.settings
+          })),
+          currentIndex: 0,
+          autoRotate: false,
+          rotateIntervalSeconds: 30
+        }
+      };
+      const chosenIds = new Set(chosen.map(w => w.id));
+      return { widgets: [...state.widgets.filter(w => !chosenIds.has(w.id)), stack] };
     });
     persist(get, { widgets: true });
   },
