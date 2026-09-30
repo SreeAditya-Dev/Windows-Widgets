@@ -12,4 +12,6 @@ export interface SystemStats {
 export type WidgetCommand =
   | { type: 'toggle-gallery'; value?: boolean }
   | { type: 'edit-mode'; value?: boolean }
-  | { type: 'reset-layout' };
+  | { type: 'reset-layout' }
+  /** Another app was activated: close gallery / edit mode / context menu */
+  | { type: 'dismiss-overlay' };

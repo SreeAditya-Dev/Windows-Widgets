@@ -2,7 +2,7 @@ import { app, BrowserWindow, screen, ipcMain, dialog, nativeTheme, shell } from 
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { pinWindowToDesktop, startDesktopGuard, setWindowActivatable } from './win32';
+import { pinWindowToDesktop, startDesktopGuard, setWindowActivatable, lowerWindowToBottom } from './win32';
 import { ConfigStore } from './store';
 import { setupTray, refreshTray, TrayActions } from './tray';
 import type { StoredConfig, AppSettings } from '../src/types/widget';
@@ -96,8 +96,13 @@ function createWidgetWindow(): BrowserWindow {
     stopGuard = startDesktopGuard(win, () => ({
       showOnDesktop: settings().showOnDesktop,
       alwaysOnTop: settings().alwaysOnTop,
-      overlay: overlayActive
-    }));
+      overlay: overlayActive,
+      isSettingsOpen: !!settingsWindow && !settingsWindow.isDestroyed() && settingsWindow.isVisible() && !settingsWindow.isMinimized()
+    }), () => {
+      // Another app took focus while the gallery / edit mode / a menu was open: close it
+      overlayActive = false;
+      if (!win.isDestroyed()) win.webContents.send('widget-command', { type: 'dismiss-overlay' } satisfies WidgetCommand);
+    });
   });
 
   // Show Desktop must never hide the widget layer
@@ -114,10 +119,14 @@ function createWidgetWindow(): BrowserWindow {
 // 3. Settings window (macOS System Settings style)
 // ==========================================
 function openSettings(section?: string) {
+  if (widgetWindow && !widgetWindow.isDestroyed()) {
+    lowerWindowToBottom(widgetWindow);
+  }
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     if (settingsWindow.isMinimized()) settingsWindow.restore();
     settingsWindow.show();
     settingsWindow.focus();
+    settingsWindow.moveTop();
     if (section) settingsWindow.webContents.send('open-section', section);
     return;
   }
@@ -141,7 +150,14 @@ function openSettings(section?: string) {
   });
 
   rendererEntry(settingsWindow, section ? `settings/${section}` : 'settings');
-  settingsWindow.once('ready-to-show', () => settingsWindow?.show());
+  settingsWindow.once('ready-to-show', () => {
+    if (widgetWindow && !widgetWindow.isDestroyed()) {
+      lowerWindowToBottom(widgetWindow);
+    }
+    settingsWindow?.show();
+    settingsWindow?.focus();
+    settingsWindow?.moveTop();
+  });
   settingsWindow.on('closed', () => {
     settingsWindow = null;
   });

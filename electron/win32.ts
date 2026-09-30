@@ -95,7 +95,7 @@ function isShellWindow(hwnd: number): boolean {
   api.GetWindowThreadProcessId(hwnd, pidBuf);
   const pid = pidBuf.readUInt32LE(0);
   if (!pid) return false;
-  if (pid === process.pid) return hwnd !== ownHwnd;
+  if (pid === process.pid) return false;
   const h = api.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
   if (!h) return false;
   try {
@@ -107,6 +107,13 @@ function isShellWindow(hwnd: number): boolean {
   } finally {
     api.CloseHandle(h);
   }
+}
+
+/** True for windows owned by this app (widget layer, Settings, file dialogs, tray menu). */
+function isOwnProcessWindow(hwnd: number): boolean {
+  if (!api || !hwnd) return false;
+  api.GetWindowThreadProcessId(hwnd, pidBuf);
+  return pidBuf.readUInt32LE(0) === process.pid;
 }
 
 function setExStyleFlag(win: BrowserWindow, flag: number, on: boolean) {
@@ -144,6 +151,18 @@ export function setWindowActivatable(win: BrowserWindow, activatable: boolean): 
   }
 }
 
+/** Immediately pushes the window to the bottom of the z-order behind all apps. */
+export function lowerWindowToBottom(win: BrowserWindow): void {
+  if (!api || win.isDestroyed()) return;
+  try {
+    const hwnd = getHwnd(win);
+    api.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_FLAGS);
+    api.SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_FLAGS);
+  } catch (err) {
+    console.error('[Win32] Failed to lower window to bottom:', err);
+  }
+}
+
 export interface DesktopGuardOptions {
   /** Raise above the Show Desktop layer (Win+D / 3-finger swipe down) */
   showOnDesktop: boolean;
@@ -151,6 +170,8 @@ export interface DesktopGuardOptions {
   alwaysOnTop: boolean;
   /** Gallery / menu / edit mode open: stay on top while the user interacts */
   overlay: boolean;
+  /** Settings window is currently open / visible: widgets must stay below it */
+  isSettingsOpen?: boolean;
 }
 
 const DESKTOP_CLASSES = new Set(['WorkerW', 'Progman']);
@@ -167,7 +188,12 @@ const MENU_CLASSES = new Set(['#32768']);
  *
  * This is the same technique Rainmeter uses for its "On Desktop" position.
  */
-export function startDesktopGuard(win: BrowserWindow, getOptions: () => DesktopGuardOptions): () => void {
+export function startDesktopGuard(
+  win: BrowserWindow,
+  getOptions: () => DesktopGuardOptions,
+  /** Called when a normal app is activated while overlay UI (gallery / edit mode / menu) is open */
+  onAppActivated?: () => void
+): () => void {
   if (!api) return () => {};
   const w32 = api;
   const hwnd = getHwnd(win);
@@ -198,15 +224,30 @@ export function startDesktopGuard(win: BrowserWindow, getOptions: () => DesktopG
       const fgChanged = fg !== lastForeground;
       lastForeground = fg;
 
+      const fgClass = getClassName(fg);
+      const isDesktop = DESKTOP_CLASSES.has(fgClass);
+      const isShell = MENU_CLASSES.has(fgClass) || isShellWindow(fg);
+      const isApp = !!fg && fg !== hwnd && !isDesktop && !isShell && !isOwnProcessWindow(fg);
+
+      // Switching to another app ends widget editing (like macOS), so the overlay
+      // can never leave the widget layer floating above that app
+      if (opts.overlay && !opts.alwaysOnTop && isApp && fgChanged) {
+        onAppActivated?.();
+        opts.overlay = false;
+      }
+
       let want: 'top' | 'bottom';
-      if (opts.alwaysOnTop || opts.overlay) {
+      if (opts.isSettingsOpen) {
+        // While the Settings window is open, widgets must stay on the desktop layer behind it
+        want = 'bottom';
+      } else if (opts.alwaysOnTop || opts.overlay) {
         want = 'top';
       } else if (fg === hwnd) {
         // User is typing into a widget – keep whatever layer we were on
         want = applied ?? 'bottom';
-      } else if (opts.showOnDesktop && DESKTOP_CLASSES.has(getClassName(fg))) {
+      } else if (opts.showOnDesktop && isDesktop) {
         want = 'top';
-      } else if (MENU_CLASSES.has(getClassName(fg)) || isShellWindow(fg)) {
+      } else if (isShell) {
         // Tray flyout / context menu / taskbar is open – keep the current layer
         want = applied ?? 'bottom';
       } else {

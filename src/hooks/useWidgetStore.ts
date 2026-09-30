@@ -145,6 +145,9 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
         case 'reset-layout':
           get().resetLayout();
           break;
+        case 'dismiss-overlay':
+          set({ isGalleryOpen: false, editMode: false, contextMenu: { isOpen: false, x: 0, y: 0, widgetId: null } });
+          break;
       }
     });
   },

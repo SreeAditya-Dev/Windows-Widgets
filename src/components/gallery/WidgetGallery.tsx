@@ -104,7 +104,7 @@ export const WidgetGallery: React.FC = () => {
                   <h3 className="text-[15px] font-semibold">{meta.title}</h3>
                 </div>
                 <p className="text-[12px] text-ink/55 mb-3">{meta.description}</p>
-                <div className="flex items-end gap-5 overflow-x-auto no-scrollbar pb-1">
+                <div className="flex items-end gap-5 overflow-x-auto no-scrollbar pt-3 pl-3 pr-3 pb-1 -mt-3 -ml-3">
                   {meta.sizes.map(sz => {
                     const added = justAdded === `${meta.type}:${sz}`;
                     return (
