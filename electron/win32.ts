@@ -1,0 +1,185 @@
+import koffi from 'koffi';
+import { BrowserWindow } from 'electron';
+
+// Win32 Constants
+const GWL_EXSTYLE = -20;
+const WS_EX_TOOLWINDOW = 0x00000080;
+const WS_EX_NOACTIVATE = 0x08000000;
+const WS_EX_APPWINDOW = 0x00040000;
+
+const HWND_TOPMOST = -1;
+const HWND_NOTOPMOST = -2;
+const HWND_BOTTOM = 1;
+
+const SWP_NOSIZE = 0x0001;
+const SWP_NOMOVE = 0x0002;
+const SWP_NOACTIVATE = 0x0010;
+const SWP_SHOWWINDOW = 0x0040;
+const SWP_NOOWNERZORDER = 0x0200;
+const SWP_FLAGS = SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+
+const SW_SHOWNOACTIVATE = 4;
+
+interface Win32API {
+  GetWindowLongPtr: (hwnd: number, index: number) => number;
+  SetWindowLongPtr: (hwnd: number, index: number, newLong: number) => number;
+  SetWindowPos: (hwnd: number, after: number, x: number, y: number, cx: number, cy: number, flags: number) => boolean;
+  GetForegroundWindow: () => number;
+  GetClassNameW: (hwnd: number, buf: Buffer, max: number) => number;
+  IsIconic: (hwnd: number) => boolean;
+  IsWindowVisible: (hwnd: number) => boolean;
+  ShowWindow: (hwnd: number, cmd: number) => boolean;
+}
+
+let api: Win32API | null = null;
+
+if (process.platform === 'win32') {
+  try {
+    const user32 = koffi.load('user32.dll');
+    const is64 = process.arch === 'x64' || process.arch === 'arm64';
+
+    api = {
+      GetWindowLongPtr: user32.func(is64 ? 'GetWindowLongPtrW' : 'GetWindowLongW', 'intptr_t', ['intptr_t', 'int32_t']),
+      SetWindowLongPtr: user32.func(is64 ? 'SetWindowLongPtrW' : 'SetWindowLongW', 'intptr_t', ['intptr_t', 'int32_t', 'intptr_t']),
+      SetWindowPos: user32.func('SetWindowPos', 'bool', ['intptr_t', 'intptr_t', 'int', 'int', 'int', 'int', 'uint32_t']),
+      GetForegroundWindow: user32.func('GetForegroundWindow', 'intptr_t', []),
+      GetClassNameW: user32.func('GetClassNameW', 'int', ['intptr_t', 'void *', 'int']),
+      IsIconic: user32.func('IsIconic', 'bool', ['intptr_t']),
+      IsWindowVisible: user32.func('IsWindowVisible', 'bool', ['intptr_t']),
+      ShowWindow: user32.func('ShowWindow', 'bool', ['intptr_t', 'int'])
+    };
+  } catch (err) {
+    console.warn('[Win32] Failed to initialize koffi user32 bindings:', err);
+  }
+}
+
+/**
+ * Extracts the HWND from an Electron BrowserWindow handle Buffer as a number
+ */
+export function getHwnd(win: BrowserWindow): number {
+  const buffer = win.getNativeWindowHandle();
+  if (buffer.length >= 8) {
+    return Number(buffer.readBigInt64LE(0));
+  }
+  return buffer.readInt32LE(0);
+}
+
+const classBuf = Buffer.alloc(512);
+function getClassName(hwnd: number): string {
+  if (!api || !hwnd) return '';
+  const len = api.GetClassNameW(hwnd, classBuf, 256);
+  return len > 0 ? classBuf.toString('utf16le', 0, len * 2) : '';
+}
+
+function setExStyleFlag(win: BrowserWindow, flag: number, on: boolean) {
+  if (!api) return;
+  const hwnd = getHwnd(win);
+  const cur = Number(api.GetWindowLongPtr(hwnd, GWL_EXSTYLE));
+  const next = (on ? cur | flag : cur & ~flag) >>> 0;
+  if (next !== cur >>> 0) api.SetWindowLongPtr(hwnd, GWL_EXSTYLE, next);
+}
+
+/**
+ * Configures the window to behave as a desktop widget layer:
+ * - Removed from Alt+Tab, Taskbar, and Task View (WS_EX_TOOLWINDOW)
+ * - Does not steal focus when clicked (WS_EX_NOACTIVATE)
+ */
+export function pinWindowToDesktop(win: BrowserWindow): void {
+  if (!api) return;
+  try {
+    const hwnd = getHwnd(win);
+    const cur = Number(api.GetWindowLongPtr(hwnd, GWL_EXSTYLE));
+    const next = ((cur | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW) >>> 0;
+    api.SetWindowLongPtr(hwnd, GWL_EXSTYLE, next);
+    api.SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_FLAGS);
+  } catch (err) {
+    console.error('[Win32] Failed to set window styles:', err);
+  }
+}
+
+/** Allow / disallow the widget layer from taking keyboard focus. */
+export function setWindowActivatable(win: BrowserWindow, activatable: boolean): void {
+  try {
+    setExStyleFlag(win, WS_EX_NOACTIVATE, !activatable);
+  } catch (err) {
+    console.error('[Win32] Failed to toggle WS_EX_NOACTIVATE:', err);
+  }
+}
+
+export interface DesktopGuardOptions {
+  /** Raise above the Show Desktop layer (Win+D / 3-finger swipe down) */
+  showOnDesktop: boolean;
+  /** Always float above every window */
+  alwaysOnTop: boolean;
+  /** Gallery / menu / edit mode open: stay on top while the user interacts */
+  overlay: boolean;
+}
+
+const DESKTOP_CLASSES = new Set(['WorkerW', 'Progman']);
+
+/**
+ * Keeps the widget layer where macOS keeps its widgets: on the desktop.
+ *
+ * Normally the window sits at the very bottom of the z-order (behind every app).
+ * When the desktop itself becomes the foreground window — which is exactly what
+ * Show Desktop, Win+D, the 3-finger swipe down and clicking the desktop do — the
+ * window is raised to TOPMOST so it stays visible above the desktop/peek layer.
+ * As soon as an app is activated again it drops back to the bottom.
+ *
+ * This is the same technique Rainmeter uses for its "On Desktop" position.
+ */
+export function startDesktopGuard(win: BrowserWindow, getOptions: () => DesktopGuardOptions): () => void {
+  if (!api) return () => {};
+  const w32 = api;
+  const hwnd = getHwnd(win);
+  let applied: 'top' | 'bottom' | null = null;
+  let lastForeground = -1;
+
+  const apply = (want: 'top' | 'bottom') => {
+    if (want === 'top') {
+      w32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS | SWP_SHOWWINDOW);
+    } else {
+      if (applied !== 'bottom') w32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_FLAGS);
+      w32.SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_FLAGS);
+    }
+    applied = want;
+  };
+
+  const tick = () => {
+    if (win.isDestroyed()) return;
+    try {
+      // Never let the widget layer stay minimized / hidden
+      if (w32.IsIconic(hwnd) || !w32.IsWindowVisible(hwnd)) {
+        w32.ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+      }
+
+      const opts = getOptions();
+      const fg = Number(w32.GetForegroundWindow());
+      const fgChanged = fg !== lastForeground;
+      lastForeground = fg;
+
+      let want: 'top' | 'bottom';
+      if (opts.alwaysOnTop || opts.overlay) {
+        want = 'top';
+      } else if (fg === hwnd) {
+        // User is typing into a widget – keep whatever layer we were on
+        want = applied ?? 'bottom';
+      } else if (opts.showOnDesktop && DESKTOP_CLASSES.has(getClassName(fg))) {
+        want = 'top';
+      } else {
+        want = 'bottom';
+      }
+
+      // Re-apply bottom whenever focus moves, because activating our own window raises it
+      if (want !== applied || (want === 'bottom' && fgChanged)) {
+        apply(want);
+      }
+    } catch (err) {
+      console.error('[Win32] desktop guard tick failed:', err);
+    }
+  };
+
+  tick();
+  const timer = setInterval(tick, 120);
+  return () => clearInterval(timer);
+}
