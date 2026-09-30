@@ -29,6 +29,10 @@ interface Win32API {
   IsIconic: (hwnd: number) => boolean;
   IsWindowVisible: (hwnd: number) => boolean;
   ShowWindow: (hwnd: number, cmd: number) => boolean;
+  GetWindowThreadProcessId: (hwnd: number, pid: Buffer) => number;
+  OpenProcess: (access: number, inherit: boolean, pid: number) => number;
+  CloseHandle: (h: number) => boolean;
+  QueryFullProcessImageNameW: (h: number, flags: number, buf: Buffer, size: Buffer) => boolean;
 }
 
 let api: Win32API | null = null;
@@ -36,6 +40,7 @@ let api: Win32API | null = null;
 if (process.platform === 'win32') {
   try {
     const user32 = koffi.load('user32.dll');
+    const kernel32 = koffi.load('kernel32.dll');
     const is64 = process.arch === 'x64' || process.arch === 'arm64';
 
     api = {
@@ -46,7 +51,11 @@ if (process.platform === 'win32') {
       GetClassNameW: user32.func('GetClassNameW', 'int', ['intptr_t', 'void *', 'int']),
       IsIconic: user32.func('IsIconic', 'bool', ['intptr_t']),
       IsWindowVisible: user32.func('IsWindowVisible', 'bool', ['intptr_t']),
-      ShowWindow: user32.func('ShowWindow', 'bool', ['intptr_t', 'int'])
+      ShowWindow: user32.func('ShowWindow', 'bool', ['intptr_t', 'int']),
+      GetWindowThreadProcessId: user32.func('GetWindowThreadProcessId', 'uint32_t', ['intptr_t', 'void *']),
+      OpenProcess: kernel32.func('OpenProcess', 'intptr_t', ['uint32_t', 'bool', 'uint32_t']),
+      CloseHandle: kernel32.func('CloseHandle', 'bool', ['intptr_t']),
+      QueryFullProcessImageNameW: kernel32.func('QueryFullProcessImageNameW', 'bool', ['intptr_t', 'uint32_t', 'void *', 'void *'])
     };
   } catch (err) {
     console.warn('[Win32] Failed to initialize koffi user32 bindings:', err);
@@ -69,6 +78,35 @@ function getClassName(hwnd: number): string {
   if (!api || !hwnd) return '';
   const len = api.GetClassNameW(hwnd, classBuf, 256);
   return len > 0 ? classBuf.toString('utf16le', 0, len * 2) : '';
+}
+
+const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+let ownHwnd = 0;
+const pidBuf = Buffer.alloc(4);
+const pathBuf = Buffer.alloc(1040);
+const sizeBuf = Buffer.alloc(4);
+
+/**
+ * True for shell surfaces (desktop, tray flyout, context menus, taskbar) and for this
+ * app's own helper windows (tray menu). File Explorer folder windows count as apps.
+ */
+function isShellWindow(hwnd: number): boolean {
+  if (!api || !hwnd) return false;
+  api.GetWindowThreadProcessId(hwnd, pidBuf);
+  const pid = pidBuf.readUInt32LE(0);
+  if (!pid) return false;
+  if (pid === process.pid) return hwnd !== ownHwnd;
+  const h = api.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+  if (!h) return false;
+  try {
+    sizeBuf.writeUInt32LE(520, 0);
+    if (!api.QueryFullProcessImageNameW(h, 0, pathBuf, sizeBuf)) return false;
+    const len = sizeBuf.readUInt32LE(0);
+    const isExplorer = pathBuf.toString('utf16le', 0, len * 2).toLowerCase().endsWith('\\explorer.exe');
+    return isExplorer && getClassName(hwnd) !== 'CabinetWClass';
+  } finally {
+    api.CloseHandle(h);
+  }
 }
 
 function setExStyleFlag(win: BrowserWindow, flag: number, on: boolean) {
@@ -116,6 +154,7 @@ export interface DesktopGuardOptions {
 }
 
 const DESKTOP_CLASSES = new Set(['WorkerW', 'Progman']);
+const MENU_CLASSES = new Set(['#32768']);
 
 /**
  * Keeps the widget layer where macOS keeps its widgets: on the desktop.
@@ -132,6 +171,7 @@ export function startDesktopGuard(win: BrowserWindow, getOptions: () => DesktopG
   if (!api) return () => {};
   const w32 = api;
   const hwnd = getHwnd(win);
+  ownHwnd = hwnd;
   let applied: 'top' | 'bottom' | null = null;
   let lastForeground = -1;
 
@@ -166,6 +206,9 @@ export function startDesktopGuard(win: BrowserWindow, getOptions: () => DesktopG
         want = applied ?? 'bottom';
       } else if (opts.showOnDesktop && DESKTOP_CLASSES.has(getClassName(fg))) {
         want = 'top';
+      } else if (MENU_CLASSES.has(getClassName(fg)) || isShellWindow(fg)) {
+        // Tray flyout / context menu / taskbar is open – keep the current layer
+        want = applied ?? 'bottom';
       } else {
         want = 'bottom';
       }
