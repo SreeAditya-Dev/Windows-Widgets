@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { WidgetInstance, SIZE_LABELS, WidgetType, SmartStackItem } from '../types/widget';
 import { WIDGET_META, WIDGET_ORDER, TINT_SWATCHES, defaultSettingsFor } from '../widgets/defaults';
 import { searchCity, GeoResult } from '../widgets/weatherApi';
+import { choosePhotos } from '../widgets/shared';
 import { useWidgetStore } from '../hooks/useWidgetStore';
 import { Group, Row, Switch, Segmented, Slider, Swatches, Button, TextInput, Select } from './controls';
 import { Trash2, Plus, X } from 'lucide-react';
@@ -20,6 +21,13 @@ const zoneOptions = (withLocal: boolean) => [
 ];
 
 const cityFromZone = (z: string) => z.split('/').pop()!.replace(/_/g, ' ');
+
+const photoSourceHint = (s: { customImages?: string[]; source?: string; sourceLabel?: string }) => {
+  const count = s.customImages?.length || 0;
+  if (!count) return 'Showing sample photos';
+  if (s.source === 'photo' || count === 1) return `One photo${s.sourceLabel ? `: ${s.sourceLabel}` : ''}`;
+  return `${count} photos${s.sourceLabel ? ` from “${s.sourceLabel}”` : ''}`;
+};
 
 const CitySearch: React.FC<{ onPick: (g: GeoResult) => void }> = ({ onPick }) => {
   const [q, setQ] = useState('');
@@ -215,19 +223,36 @@ export const WidgetEditor: React.FC<{ widget: WidgetInstance; style: string }> =
 
       {widget.type === 'photos' && (
         <Group title="Photos">
-          <Row label="Photo folder" hint={s.customImages?.length ? `${s.customImages.length} photos selected` : 'Showing sample photos'}>
-            <Button
-              onClick={async () => {
-                const imgs = await window.electronAPI?.openDirectoryDialog();
-                if (imgs && imgs.length) set({ customImages: imgs });
-              }}
-            >
-              Choose Folder…
-            </Button>
+          <Row label="Show" hint={photoSourceHint(s)}>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                onClick={async () => {
+                  const patch = await choosePhotos('photo');
+                  if (patch) set(patch);
+                }}
+              >
+                One Photo…
+              </Button>
+              <Button
+                onClick={async () => {
+                  const patch = await choosePhotos('folder');
+                  if (patch) set(patch);
+                }}
+              >
+                Folder…
+              </Button>
+            </div>
           </Row>
-          <Row label="Change photo every">
-            <Slider value={s.cycleIntervalSeconds} min={5} max={120} step={5} onChange={v => set({ cycleIntervalSeconds: v })} format={v => `${v}s`} />
-          </Row>
+          {!!s.customImages?.length && (
+            <Row label="Go back to the sample photos">
+              <Button onClick={() => set({ customImages: [], source: undefined, sourceLabel: undefined })}>Use Samples</Button>
+            </Row>
+          )}
+          {(s.customImages?.length || 0) !== 1 && (
+            <Row label="Change photo every">
+              <Slider value={s.cycleIntervalSeconds} min={5} max={120} step={5} onChange={v => set({ cycleIntervalSeconds: v })} format={v => `${v}s`} />
+            </Row>
+          )}
           <Row label="Motion">
             <Segmented value={s.effect === 'static' ? 'static' : 'ken-burns'} options={[{ value: 'ken-burns', label: 'Ken Burns' }, { value: 'static', label: 'Still' }]} onChange={v => set({ effect: v })} />
           </Row>

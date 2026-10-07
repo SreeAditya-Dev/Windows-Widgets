@@ -2,7 +2,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useWidgetStore } from '../hooks/useWidgetStore';
 import { SIZE_LABELS } from '../types/widget';
 import { WIDGET_META, TINT_SWATCHES } from '../widgets/defaults';
-import { Trash2, Lock, Unlock, Layers, Check, Settings, SquarePen, FolderOpen, SplitSquareVertical, SlidersHorizontal } from 'lucide-react';
+import { choosePhotos } from '../widgets/shared';
+import { Trash2, Lock, Unlock, Layers, Check, Settings, SquarePen, FolderOpen, Image as ImageIcon, SplitSquareVertical, SlidersHorizontal } from 'lucide-react';
 
 const Item: React.FC<{
   icon?: React.ReactNode;
@@ -104,15 +105,26 @@ export const ContextMenu: React.FC = () => {
       )}
 
       {widget.type === 'photos' && (
-        <Item
-          icon={<FolderOpen size={13} />}
-          onClick={run(async () => {
-            const imgs = await window.electronAPI?.openDirectoryDialog();
-            if (imgs && imgs.length) updateSettings(widget.id, { customImages: imgs });
-          })}
-        >
-          Choose Photo Folder…
-        </Item>
+        <>
+          <Item
+            icon={<ImageIcon size={13} />}
+            onClick={run(async () => {
+              const patch = await choosePhotos('photo');
+              if (patch) updateSettings(widget.id, patch);
+            })}
+          >
+            Choose Photo…
+          </Item>
+          <Item
+            icon={<FolderOpen size={13} />}
+            onClick={run(async () => {
+              const patch = await choosePhotos('folder');
+              if (patch) updateSettings(widget.id, patch);
+            })}
+          >
+            Choose Photo Folder…
+          </Item>
+        </>
       )}
       <Item icon={<Settings size={13} />} onClick={run(() => window.electronAPI?.openSettings(`widget:${widget.id}`))}>
         Edit “{meta.title}”…

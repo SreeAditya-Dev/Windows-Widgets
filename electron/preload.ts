@@ -1,12 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { StoredConfig } from '../src/types/widget';
-import type { SystemStats, WidgetCommand } from '../src/types/ipc';
+import type { SystemStats, WidgetCommand, PhotoPick } from '../src/types/ipc';
 
 export interface ElectronAPI {
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => void;
   loadConfig: () => Promise<StoredConfig>;
   saveConfig: (config: Partial<StoredConfig>) => Promise<boolean>;
-  openDirectoryDialog: () => Promise<string[] | null>;
+  /** Pick a folder of photos or a single photo for the Photos widget */
+  openPhotoDialog: (kind: PhotoPick['kind']) => Promise<PhotoPick | null>;
   getSystemStats: () => Promise<SystemStats>;
   /** Gallery / menu / edit mode open: keep the widget layer above apps */
   setOverlayActive: (active: boolean) => void;
@@ -34,7 +35,7 @@ const api: ElectronAPI = {
   setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
   loadConfig: () => ipcRenderer.invoke('load-config'),
   saveConfig: config => ipcRenderer.invoke('save-config', config),
-  openDirectoryDialog: () => ipcRenderer.invoke('open-directory-dialog'),
+  openPhotoDialog: kind => ipcRenderer.invoke('open-photo-dialog', kind),
   getSystemStats: () => ipcRenderer.invoke('get-system-stats'),
   setOverlayActive: active => ipcRenderer.send('set-overlay-active', active),
   requestFocus: () => ipcRenderer.send('request-focus'),

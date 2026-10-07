@@ -32,6 +32,10 @@ export interface PhotosSettings {
   cycleIntervalSeconds: number;
   effect: 'ken-burns' | 'fade' | 'static';
   customImages?: string[];
+  /** Where customImages came from: a whole folder or a single photo */
+  source?: 'folder' | 'photo';
+  /** Folder name or photo name shown on the widget */
+  sourceLabel?: string;
 }
 
 export interface TimerSettings {

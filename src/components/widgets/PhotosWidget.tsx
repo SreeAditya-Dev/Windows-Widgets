@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PhotosSettings } from '../../types/widget';
-import { WidgetProps } from '../../widgets/shared';
+import { WidgetProps, choosePhotos } from '../../widgets/shared';
 import { Image as ImageIcon, FolderOpen } from 'lucide-react';
 
 // Built-in curated high-res scenic photos inspired by Apple macOS Sonoma / Sequoia wallpapers
@@ -59,30 +59,32 @@ export const PhotosWidget: React.FC<WidgetProps<PhotosSettings>> = ({ settings, 
     setPhotoIndex(prev => (prev + 1) % totalCount);
   };
 
-  const handleSelectFolder = async (e: React.MouseEvent) => {
+  const handlePick = (kind: 'folder' | 'photo') => async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.electronAPI) {
-      const images = await window.electronAPI.openDirectoryDialog();
-      if (images && images.length > 0) {
-        setPhotosList(images);
-        setPhotoIndex(0);
-        onSettings({ customImages: images });
-      }
-    }
+    const patch = await choosePhotos(kind);
+    if (!patch) return;
+    setPhotosList(patch.customImages!);
+    setPhotoIndex(0);
+    onSettings(patch);
   };
 
   const isCustom = photosList.length > 0;
+  const isSinglePhoto = photosList.length === 1;
   const currentPhotoUrl = isCustom
     ? photosList[photoIndex % photosList.length]
     : DEFAULT_CURATED_PHOTOS[photoIndex % DEFAULT_CURATED_PHOTOS.length].url;
 
-  const currentTitle = isCustom
-    ? `Photo ${photoIndex + 1} of ${photosList.length}`
-    : DEFAULT_CURATED_PHOTOS[photoIndex % DEFAULT_CURATED_PHOTOS.length].title;
+  const currentTitle = isSinglePhoto
+    ? settings?.sourceLabel || 'My Photo'
+    : isCustom
+      ? `Photo ${(photoIndex % photosList.length) + 1} of ${photosList.length}`
+      : DEFAULT_CURATED_PHOTOS[photoIndex % DEFAULT_CURATED_PHOTOS.length].title;
 
-  const currentCategory = isCustom
-    ? 'Local Album'
-    : DEFAULT_CURATED_PHOTOS[photoIndex % DEFAULT_CURATED_PHOTOS.length].category;
+  const currentCategory = isSinglePhoto
+    ? 'Photo'
+    : isCustom
+      ? (settings?.source === 'folder' && settings.sourceLabel) || 'Local Album'
+      : DEFAULT_CURATED_PHOTOS[photoIndex % DEFAULT_CURATED_PHOTOS.length].category;
 
   return (
     <div
@@ -120,14 +122,23 @@ export const PhotosWidget: React.FC<WidgetProps<PhotosSettings>> = ({ settings, 
         />
       </div>
 
-      {/* Top right folder picker button (appears on hover) */}
-      <button
-        onClick={handleSelectFolder}
-        title="Select photo folder from PC"
-        className="absolute top-3 right-3 p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white backdrop-blur-md opacity-0 group-hover/photo:opacity-100 transition-opacity z-10"
-      >
-        <FolderOpen size={14} />
-      </button>
+      {/* Top right pickers (appear on hover): one photo, or a whole folder */}
+      <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover/photo:opacity-100 transition-opacity z-10">
+        <button
+          onClick={handlePick('photo')}
+          title="Show one photo from your PC"
+          className="p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white backdrop-blur-md"
+        >
+          <ImageIcon size={14} />
+        </button>
+        <button
+          onClick={handlePick('folder')}
+          title="Show a folder of photos from your PC"
+          className="p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white backdrop-blur-md"
+        >
+          <FolderOpen size={14} />
+        </button>
+      </div>
 
       {/* Bottom left Apple-style photo metadata glass pill */}
       <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between pointer-events-none">

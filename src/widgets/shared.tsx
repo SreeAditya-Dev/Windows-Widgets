@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { WidgetSize } from '../types/widget';
+import { WidgetSize, PhotosSettings } from '../types/widget';
 
 export interface WidgetProps<S = Record<string, any>> {
   id: string;
@@ -7,6 +7,16 @@ export interface WidgetProps<S = Record<string, any>> {
   settings: S;
   onSettings: (patch: Partial<S>) => void;
   preview?: boolean;
+}
+
+/**
+ * Opens the photo picker and returns the Photos settings to apply, or null if the
+ * user cancelled (or a folder had no images, so the current photos are kept).
+ */
+export async function choosePhotos(kind: 'folder' | 'photo'): Promise<Partial<PhotosSettings> | null> {
+  const pick = await window.electronAPI?.openPhotoDialog(kind);
+  if (!pick || pick.images.length === 0) return null;
+  return { customImages: pick.images, source: pick.kind, sourceLabel: pick.label };
 }
 
 /** Re-render every `ms` milliseconds, aligned to the wall clock. */

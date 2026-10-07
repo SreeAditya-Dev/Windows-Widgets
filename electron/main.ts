@@ -2,11 +2,12 @@ import { app, BrowserWindow, screen, ipcMain, dialog, nativeTheme, shell } from 
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { pathToFileURL } from 'url';
 import { pinWindowToDesktop, startDesktopGuard, setWindowActivatable, lowerWindowToBottom } from './win32';
 import { ConfigStore } from './store';
 import { setupTray, refreshTray, TrayActions } from './tray';
 import type { StoredConfig, AppSettings } from '../src/types/widget';
-import type { SystemStats, WidgetCommand } from '../src/types/ipc';
+import type { SystemStats, WidgetCommand, PhotoPick } from '../src/types/ipc';
 
 // ==========================================
 // 1. RAM & Chromium Optimization Flags
@@ -354,25 +355,33 @@ app.whenReady().then(() => {
   ipcMain.on('close-window', event => BrowserWindow.fromWebContents(event.sender)?.close());
   ipcMain.on('minimize-window', event => BrowserWindow.fromWebContents(event.sender)?.minimize());
 
-  ipcMain.handle('open-directory-dialog', async event => {
+  ipcMain.handle('open-photo-dialog', async (event, kind: PhotoPick['kind']): Promise<PhotoPick | null> => {
     const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
     if (parent === widgetWindow) setWindowActivatable(parent!, true);
-    const result = parent
-      ? await dialog.showOpenDialog(parent, { properties: ['openDirectory'] })
-      : await dialog.showOpenDialog({ properties: ['openDirectory'] });
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'avif', 'gif'];
+    const options: Electron.OpenDialogOptions =
+      kind === 'photo'
+        ? { title: 'Choose a Photo', properties: ['openFile'], filters: [{ name: 'Images', extensions: imageExtensions }] }
+        : { title: 'Choose a Photo Folder', properties: ['openDirectory'] };
+    const result = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
 
     if (result.canceled || result.filePaths.length === 0) return null;
+    const picked = result.filePaths[0];
+    // pathToFileURL escapes spaces, '#' and '%' so the URL works inside CSS url()
+    const toUrl = (file: string) => pathToFileURL(file).href;
 
-    const folder = result.filePaths[0];
+    if (kind === 'photo') {
+      return { kind, label: path.parse(picked).name, images: [toUrl(picked)] };
+    }
     try {
-      const imageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.avif', '.gif']);
-      return fs
-        .readdirSync(folder)
-        .filter(f => imageExtensions.has(path.extname(f).toLowerCase()))
-        .map(f => `file:///${path.join(folder, f).replace(/\\/g, '/')}`);
+      const images = fs
+        .readdirSync(picked)
+        .filter(f => imageExtensions.includes(path.extname(f).slice(1).toLowerCase()))
+        .map(f => toUrl(path.join(picked, f)));
+      return { kind, label: path.basename(picked), images };
     } catch (e) {
       console.error('[Main] Failed to read image folder:', e);
-      return [];
+      return { kind, label: path.basename(picked), images: [] };
     }
   });
 
