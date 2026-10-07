@@ -152,8 +152,8 @@ export const WidgetEditor: React.FC<{ widget: WidgetInstance; style: string }> =
         </Group>
       )}
 
-      {widget.type === 'calendar' && (
-        <Group title="Calendar">
+      {(widget.type === 'calendar' || widget.type === 'date') && (
+        <Group title={WIDGET_META[widget.type].title}>
           <Row label="Week starts on">
             <Segmented value={s.firstDayOfWeek} options={[{ value: 0, label: 'Sunday' }, { value: 1, label: 'Monday' }]} onChange={v => set({ firstDayOfWeek: v })} />
           </Row>

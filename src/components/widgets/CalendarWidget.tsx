@@ -15,20 +15,21 @@ function buildMonth(year: number, month: number, firstDay: number) {
   return cells;
 }
 
-const MonthGrid: React.FC<{
+export const MonthGrid: React.FC<{
   year: number;
   month: number;
   today: Date;
   firstDay: number;
   cell: number;
   font: number;
-}> = ({ year, month, today, firstDay, cell, font }) => {
+  rowGap?: number;
+}> = ({ year, month, today, firstDay, cell, font, rowGap = 2 }) => {
   const cells = useMemo(() => buildMonth(year, month, firstDay), [year, month, firstDay]);
   const heads = [...WEEKDAYS.slice(firstDay), ...WEEKDAYS.slice(0, firstDay)];
   const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
 
   return (
-    <div className="grid grid-cols-7 text-center tnum" style={{ fontSize: font, rowGap: 2 }}>
+    <div className="grid grid-cols-7 text-center tnum" style={{ fontSize: font, rowGap }}>
       {heads.map((d, i) => (
         <div key={i} className="font-semibold text-ink/40" style={{ height: cell, lineHeight: `${cell}px` }}>
           {d}
@@ -56,6 +57,36 @@ const MonthGrid: React.FC<{
   );
 };
 
+const monthName = (d: Date) => d.toLocaleDateString(undefined, { month: 'long' });
+
+const NavButtons: React.FC<{ offset: number; setOffset: React.Dispatch<React.SetStateAction<number>>; compact?: boolean }> = ({
+  offset,
+  setOffset,
+  compact
+}) => {
+  const btn = compact ? 'w-5 h-5' : 'w-7 h-7';
+  const icon = compact ? 13 : 16;
+  return (
+    <div className="flex items-center gap-0.5 no-drag">
+      <button onClick={() => setOffset(o => o - 1)} className={`${btn} rounded-full hover:bg-ink/10 flex items-center justify-center text-ink/70`}>
+        <ChevronLeft size={icon} />
+      </button>
+      {offset !== 0 && (
+        <button
+          onClick={() => setOffset(0)}
+          className={`${compact ? 'px-1.5 h-5 text-[10px]' : 'px-2 h-7 text-[11px]'} rounded-full hover:bg-ink/10 font-semibold text-apple-red`}
+        >
+          Today
+        </button>
+      )}
+      <button onClick={() => setOffset(o => o + 1)} className={`${btn} rounded-full hover:bg-ink/10 flex items-center justify-center text-ink/70`}>
+        <ChevronRight size={icon} />
+      </button>
+    </div>
+  );
+};
+
+/** Month calendar: this month (small), this + next month (medium), browsable full month (large). */
 export const CalendarWidget: React.FC<WidgetProps<CalendarSettings>> = ({ size, settings }) => {
   const now = useNow(60000);
   const firstDay = settings.firstDayOfWeek ?? 1;
@@ -63,32 +94,35 @@ export const CalendarWidget: React.FC<WidgetProps<CalendarSettings>> = ({ size, 
 
   const view = new Date(now.getFullYear(), now.getMonth() + offset, 1);
   const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
-  const monthName = (d: Date) => d.toLocaleDateString(undefined, { month: 'long' });
 
   if (size === 'small') {
     return (
-      <div className="w-full h-full p-4 flex flex-col">
-        <div className="text-[13px] font-bold uppercase tracking-wide text-apple-red">{weekday}</div>
-        <div className="text-[64px] font-light leading-[1] tracking-tight mt-0.5 tnum">{now.getDate()}</div>
-        <div className="mt-auto text-[13px] font-semibold text-ink/60">
-          {monthName(now)} {now.getFullYear()}
+      <div className="w-full h-full px-3 pt-3 pb-2.5 flex flex-col">
+        <div className="text-[11px] font-bold uppercase tracking-wide text-apple-red px-1 mb-0.5">{monthName(now)}</div>
+        <div className="flex-1 flex items-center">
+          <div className="w-full">
+            <MonthGrid year={now.getFullYear()} month={now.getMonth()} today={now} firstDay={firstDay} cell={17} font={9.5} rowGap={1} />
+          </div>
         </div>
       </div>
     );
   }
 
   if (size === 'medium') {
+    const next = new Date(view.getFullYear(), view.getMonth() + 1, 1);
+    const sameYear = view.getFullYear() === next.getFullYear() && view.getFullYear() === now.getFullYear();
+    const label = (d: Date) => (sameYear ? monthName(d) : `${monthName(d)} ${d.getFullYear()}`);
     return (
-      <div className="w-full h-full flex px-4 py-3.5 gap-4">
-        <div className="w-[120px] flex flex-col">
-          <div className="text-[13px] font-bold uppercase tracking-wide text-apple-red">{weekday}</div>
-          <div className="text-[58px] font-light leading-[1] tracking-tight tnum">{now.getDate()}</div>
-          <div className="mt-auto text-[13px] font-semibold text-ink/60">{monthName(now)}</div>
-        </div>
-        <div className="flex-1">
-          <div className="text-[11px] font-bold uppercase text-apple-red mb-0.5">{monthName(now)}</div>
-          <MonthGrid year={now.getFullYear()} month={now.getMonth()} today={now} firstDay={firstDay} cell={16} font={9.5} />
-        </div>
+      <div className="w-full h-full px-4 pt-3 pb-2.5 flex gap-5">
+        {[view, next].map((m, i) => (
+          <div key={i} className="flex-1 min-w-0 flex flex-col">
+            <div className="h-5 flex items-center justify-between mb-0.5">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-apple-red truncate px-1">{label(m)}</div>
+              {i === 1 && <NavButtons offset={offset} setOffset={setOffset} compact />}
+            </div>
+            <MonthGrid year={m.getFullYear()} month={m.getMonth()} today={now} firstDay={firstDay} cell={17} font={9.5} rowGap={1} />
+          </div>
+        ))}
       </div>
     );
   }
@@ -102,19 +136,7 @@ export const CalendarWidget: React.FC<WidgetProps<CalendarSettings>> = ({ size, 
             {offset === 0 ? `${weekday} ${now.getDate()}` : view.getFullYear()}
           </div>
         </div>
-        <div className="flex items-center gap-1 no-drag">
-          <button onClick={() => setOffset(o => o - 1)} className="w-7 h-7 rounded-full hover:bg-ink/10 flex items-center justify-center text-ink/70">
-            <ChevronLeft size={16} />
-          </button>
-          {offset !== 0 && (
-            <button onClick={() => setOffset(0)} className="px-2 h-7 rounded-full hover:bg-ink/10 text-[11px] font-semibold text-apple-red">
-              Today
-            </button>
-          )}
-          <button onClick={() => setOffset(o => o + 1)} className="w-7 h-7 rounded-full hover:bg-ink/10 flex items-center justify-center text-ink/70">
-            <ChevronRight size={16} />
-          </button>
-        </div>
+        <NavButtons offset={offset} setOffset={setOffset} />
       </div>
       <div className="flex-1 flex items-center">
         <div className="w-full">

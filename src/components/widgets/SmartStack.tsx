@@ -6,7 +6,7 @@ import { WIDGET_COMPONENTS } from '../../widgets/registry';
 
 const FALLBACK: SmartStackItem[] = [
   { id: 'item-clock', type: 'analog-clock', title: 'Clock' },
-  { id: 'item-calendar', type: 'calendar', title: 'Calendar' },
+  { id: 'item-date', type: 'date', title: 'Date' },
   { id: 'item-weather', type: 'weather', title: 'Weather' }
 ];
 

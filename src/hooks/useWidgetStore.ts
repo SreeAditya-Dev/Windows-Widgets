@@ -224,7 +224,8 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     set(state => {
       const target = state.widgets.find(w => w.id === widgetId);
       if (!target || target.type === 'smart-stack') return state;
-      const second: Exclude<WidgetType, 'smart-stack'> = target.type === 'calendar' ? 'analog-clock' : 'calendar';
+      const second: Exclude<WidgetType, 'smart-stack'> =
+        target.type === 'calendar' || target.type === 'date' ? 'analog-clock' : 'calendar';
       const now = Date.now();
       const stackSize = WIDGET_META['smart-stack'].sizes.includes(target.size) ? target.size : 'small';
 

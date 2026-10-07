@@ -41,10 +41,19 @@ export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
     defaultSize: 'medium',
     tint: '#7FD1FF'
   },
+  date: {
+    type: 'date',
+    title: 'Date',
+    description: 'Today’s date — add the medium size to see the month beside it.',
+    category: 'Productivity',
+    sizes: ['small', 'medium'],
+    defaultSize: 'small',
+    tint: '#FF8A8A'
+  },
   calendar: {
     type: 'calendar',
     title: 'Calendar',
-    description: 'Today’s date and the full month at a glance.',
+    description: 'The month at a glance — the medium size shows next month too.',
     category: 'Productivity',
     sizes: ['small', 'medium', 'large'],
     defaultSize: 'small',
@@ -148,6 +157,7 @@ export const WIDGET_ORDER: WidgetType[] = [
   'analog-clock',
   'flip-clock',
   'world-clock',
+  'date',
   'calendar',
   'notes',
   'todo',
@@ -167,6 +177,8 @@ export function defaultSettingsFor(type: WidgetType): Record<string, any> {
   switch (type) {
     case 'calendar':
       return { showEvents: false, firstDayOfWeek: 1 };
+    case 'date':
+      return { firstDayOfWeek: 1 };
     case 'photos':
       return { cycleIntervalSeconds: 15, effect: 'ken-burns' };
     case 'timer':
@@ -200,7 +212,7 @@ export function defaultSettingsFor(type: WidgetType): Record<string, any> {
       return {
         items: [
           { id: uid(), type: 'analog-clock', title: 'Clock' },
-          { id: uid(), type: 'calendar', title: 'Calendar' },
+          { id: uid(), type: 'date', title: 'Date' },
           { id: uid(), type: 'weather', title: 'Weather', settings: { unit: 'c' } }
         ],
         currentIndex: 0,

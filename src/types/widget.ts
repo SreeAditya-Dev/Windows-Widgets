@@ -2,6 +2,7 @@ export type WidgetSize = 'small' | 'medium' | 'large' | 'xl';
 
 export type WidgetType =
   | 'calendar'
+  | 'date'
   | 'photos'
   | 'timer'
   | 'smart-stack'
@@ -122,6 +123,8 @@ export interface AppSettings {
   showAddButton: boolean;
   /** Set after the installed app's first launch (turns on start-with-Windows once) */
   installedSetupDone?: boolean;
+  /** Set once old small/medium Calendar widgets have been converted to Date widgets */
+  dateWidgetMigrated?: boolean;
 }
 
 export interface StoredConfig {

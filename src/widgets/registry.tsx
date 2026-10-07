@@ -5,6 +5,7 @@ import { AnalogClockWidget } from '../components/widgets/AnalogClockWidget';
 import { FlipClockWidget } from '../components/widgets/FlipClockWidget';
 import { WorldClockWidget } from '../components/widgets/WorldClockWidget';
 import { CalendarWidget } from '../components/widgets/CalendarWidget';
+import { DateWidget } from '../components/widgets/DateWidget';
 import { NotesWidget } from '../components/widgets/NotesWidget';
 import { TodoWidget } from '../components/widgets/TodoWidget';
 import { TimerWidget } from '../components/widgets/TimerWidget';
@@ -21,6 +22,7 @@ export const WIDGET_COMPONENTS: Record<WidgetType, React.FC<WidgetProps<any>>> =
   'flip-clock': FlipClockWidget,
   'world-clock': WorldClockWidget,
   calendar: CalendarWidget,
+  date: DateWidget,
   notes: NotesWidget,
   todo: TodoWidget,
   timer: TimerWidget,
@@ -38,6 +40,7 @@ export const WIDGET_ICONS: Record<WidgetType, string> = {
   'flip-clock': '⏱️',
   'world-clock': '🌍',
   calendar: '📅',
+  date: '📆',
   notes: '📝',
   todo: '✅',
   timer: '⏲️',
