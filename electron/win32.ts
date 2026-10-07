@@ -326,6 +326,10 @@ export function startDesktopGuard(
         opts.overlay = false;
       }
 
+      // Focus is on our own layer or a shell surface (taskbar, tray, menu): stay raised only
+      // while Show Desktop is still in effect, so the layer can never sit over an app window
+      const stayRaised = () => (applied === 'top' && opts.showOnDesktop && isDesktopInFront() ? 'top' : 'bottom');
+
       let want: 'top' | 'bottom';
       if (opts.overlay) {
         // Gallery / edit mode / menu is open – it must be visible to be usable
@@ -336,13 +340,13 @@ export function startDesktopGuard(
       } else if (opts.alwaysOnTop) {
         want = 'top';
       } else if (fg === hwnd) {
-        // User is typing into a widget – keep whatever layer we were on
-        want = applied ?? 'bottom';
+        // User is typing into a widget
+        want = stayRaised();
       } else if (opts.showOnDesktop && isDesktop) {
         want = isDesktopInFront() ? 'top' : 'bottom';
       } else if (isShell) {
-        // Tray flyout / context menu / taskbar is open – keep the current layer
-        want = applied ?? 'bottom';
+        // Tray flyout / context menu / taskbar is open
+        want = stayRaised();
       } else {
         want = 'bottom';
       }

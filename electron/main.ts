@@ -356,8 +356,10 @@ app.whenReady().then(() => {
   ipcMain.on('minimize-window', event => BrowserWindow.fromWebContents(event.sender)?.minimize());
 
   ipcMain.handle('open-photo-dialog', async (event, kind: PhotoPick['kind']): Promise<PhotoPick | null> => {
-    const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
-    if (parent === widgetWindow) setWindowActivatable(parent!, true);
+    // Never parent the dialog to the widget layer: when an owned dialog closes, Windows
+    // activates its owner and brings the whole full-screen layer in front of every app
+    const sender = BrowserWindow.fromWebContents(event.sender);
+    const parent = sender && sender !== widgetWindow ? sender : undefined;
     const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'avif', 'gif'];
     const options: Electron.OpenDialogOptions =
       kind === 'photo'
