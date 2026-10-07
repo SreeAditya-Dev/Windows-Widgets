@@ -6,6 +6,10 @@ const GWL_EXSTYLE = -20;
 const WS_EX_TOOLWINDOW = 0x00000080;
 const WS_EX_NOACTIVATE = 0x08000000;
 const WS_EX_APPWINDOW = 0x00040000;
+const WS_EX_TOPMOST = 0x00000008;
+
+const GW_HWNDNEXT = 2;
+const DWMWA_CLOAKED = 14;
 
 const HWND_TOPMOST = -1;
 const HWND_NOTOPMOST = -2;
@@ -33,6 +37,9 @@ interface Win32API {
   OpenProcess: (access: number, inherit: boolean, pid: number) => number;
   CloseHandle: (h: number) => boolean;
   QueryFullProcessImageNameW: (h: number, flags: number, buf: Buffer, size: Buffer) => boolean;
+  GetTopWindow: (hwnd: number) => number;
+  GetWindow: (hwnd: number, cmd: number) => number;
+  DwmGetWindowAttribute: ((hwnd: number, attr: number, out: Buffer, size: number) => number) | null;
 }
 
 let api: Win32API | null = null;
@@ -55,8 +62,17 @@ if (process.platform === 'win32') {
       GetWindowThreadProcessId: user32.func('GetWindowThreadProcessId', 'uint32_t', ['intptr_t', 'void *']),
       OpenProcess: kernel32.func('OpenProcess', 'intptr_t', ['uint32_t', 'bool', 'uint32_t']),
       CloseHandle: kernel32.func('CloseHandle', 'bool', ['intptr_t']),
-      QueryFullProcessImageNameW: kernel32.func('QueryFullProcessImageNameW', 'bool', ['intptr_t', 'uint32_t', 'void *', 'void *'])
+      QueryFullProcessImageNameW: kernel32.func('QueryFullProcessImageNameW', 'bool', ['intptr_t', 'uint32_t', 'void *', 'void *']),
+      GetTopWindow: user32.func('GetTopWindow', 'intptr_t', ['intptr_t']),
+      GetWindow: user32.func('GetWindow', 'intptr_t', ['intptr_t', 'uint32_t']),
+      DwmGetWindowAttribute: null
     };
+    try {
+      const dwmapi = koffi.load('dwmapi.dll');
+      api.DwmGetWindowAttribute = dwmapi.func('DwmGetWindowAttribute', 'int32_t', ['intptr_t', 'uint32_t', 'void *', 'uint32_t']);
+    } catch {
+      /* cloak detection unavailable – treated as not cloaked */
+    }
   } catch (err) {
     console.warn('[Win32] Failed to initialize koffi user32 bindings:', err);
   }
@@ -222,6 +238,35 @@ export interface DesktopGuardOptions {
 const DESKTOP_CLASSES = new Set(['WorkerW', 'Progman']);
 const MENU_CLASSES = new Set(['#32768']);
 
+const cloakBuf = Buffer.alloc(4);
+function isCloaked(hwnd: number): boolean {
+  if (!api?.DwmGetWindowAttribute) return false;
+  cloakBuf.writeUInt32LE(0, 0);
+  return api.DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, cloakBuf, 4) === 0 && cloakBuf.readUInt32LE(0) !== 0;
+}
+
+/**
+ * True when the desktop is actually in front of every app window – Show Desktop
+ * (Win+D, 3-finger swipe, the taskbar corner) raises a desktop WorkerW above them,
+ * or all apps are minimized. Merely clicking the wallpaper focuses the desktop
+ * while apps stay on screen; raising the widgets then would cover those apps.
+ */
+function isDesktopInFront(): boolean {
+  if (!api) return false;
+  let h = Number(api.GetTopWindow(0));
+  for (let i = 0; h && i < 2000; i++, h = Number(api.GetWindow(h, GW_HWNDNEXT))) {
+    if (h === ownHwnd || !api.IsWindowVisible(h) || api.IsIconic(h)) continue;
+    const ex = Number(api.GetWindowLongPtr(h, GWL_EXSTYLE));
+    // Topmost windows (taskbar, overlays, our own layer when raised) and tool palettes don't count
+    if (ex & (WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) continue;
+    if (isCloaked(h)) continue; // suspended UWP apps, other virtual desktops
+    if (DESKTOP_CLASSES.has(getClassName(h))) return true;
+    if (isOwnProcessWindow(h)) continue;
+    return false; // a visible app window sits above the desktop
+  }
+  return true;
+}
+
 /**
  * Keeps the widget layer where macOS keeps its widgets: on the desktop.
  *
@@ -282,16 +327,19 @@ export function startDesktopGuard(
       }
 
       let want: 'top' | 'bottom';
-      if (opts.isSettingsOpen) {
+      if (opts.overlay) {
+        // Gallery / edit mode / menu is open – it must be visible to be usable
+        want = 'top';
+      } else if (opts.isSettingsOpen) {
         // While the Settings window is open, widgets must stay on the desktop layer behind it
         want = 'bottom';
-      } else if (opts.alwaysOnTop || opts.overlay) {
+      } else if (opts.alwaysOnTop) {
         want = 'top';
       } else if (fg === hwnd) {
         // User is typing into a widget – keep whatever layer we were on
         want = applied ?? 'bottom';
       } else if (opts.showOnDesktop && isDesktop) {
-        want = 'top';
+        want = isDesktopInFront() ? 'top' : 'bottom';
       } else if (isShell) {
         // Tray flyout / context menu / taskbar is open – keep the current layer
         want = applied ?? 'bottom';

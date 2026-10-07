@@ -120,6 +120,11 @@ function createWidgetWindow(): BrowserWindow {
 // ==========================================
 function openSettings(section?: string) {
   if (widgetWindow && !widgetWindow.isDestroyed()) {
+    // The gallery / edit mode floats above apps; close it so it can't cover Settings
+    if (overlayActive) {
+      overlayActive = false;
+      widgetWindow.webContents.send('widget-command', { type: 'dismiss-overlay' } satisfies WidgetCommand);
+    }
     lowerWindowToBottom(widgetWindow);
   }
   if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -167,10 +172,17 @@ function openSettings(section?: string) {
 // 4. Helpers
 // ==========================================
 function sendCommand(cmd: WidgetCommand) {
-  if (!widgetWindow) return;
-  if (cmd.type === 'toggle-gallery' || cmd.type === 'edit-mode') {
+  if (!widgetWindow || widgetWindow.isDestroyed()) return;
+  if ((cmd.type === 'toggle-gallery' || cmd.type === 'edit-mode') && cmd.value !== false) {
     // Make sure the widget layer is visible above apps for the overlay UI
     overlayActive = true;
+    // Opened from Settings (or the tray while Settings is up): step Settings aside so
+    // the gallery / edit mode is actually visible on the desktop
+    if (settingsWindow && !settingsWindow.isDestroyed() && settingsWindow.isVisible() && !settingsWindow.isMinimized()) {
+      settingsWindow.minimize();
+    }
+    setWindowActivatable(widgetWindow, true);
+    widgetWindow.focus();
   }
   widgetWindow.webContents.send('widget-command', cmd);
 }
