@@ -156,7 +156,10 @@ function isShellWindow(hwnd: number): boolean {
   api.GetWindowThreadProcessId(hwnd, pidBuf);
   const pid = pidBuf.readUInt32LE(0);
   if (!pid) return false;
-  if (pid === process.pid) return false;
+  // The tray menu (and its hidden owner window) take the foreground while open; treating
+  // them as unknown dropped the widget layer behind the Show Desktop layer. Settings is
+  // handled separately by the guard before this check matters.
+  if (pid === process.pid) return hwnd !== ownHwnd;
   const h = api.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
   if (!h) return false;
   try {
