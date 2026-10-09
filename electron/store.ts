@@ -93,8 +93,26 @@ export class ConfigStore {
   }
 
   public save(data: Partial<StoredConfig>): void {
+    let nextWidgets = this.data.widgets;
+    if (data.widgets) {
+      if (this.data.widgets.length === data.widgets.length) {
+        // Merge individual widget settings so concurrent edits in Settings and Desktop are not lost
+        const prevMap = new Map(this.data.widgets.map(w => [w.id, w]));
+        nextWidgets = data.widgets.map(incoming => {
+          const prev = prevMap.get(incoming.id);
+          if (!prev) return incoming;
+          return {
+            ...prev,
+            ...incoming,
+            settings: { ...(prev.settings || {}), ...(incoming.settings || {}) }
+          };
+        });
+      } else {
+        nextWidgets = data.widgets;
+      }
+    }
     this.data = {
-      widgets: data.widgets || this.data.widgets,
+      widgets: nextWidgets,
       settings: data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : this.data.settings
     };
     try {

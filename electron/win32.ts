@@ -281,6 +281,13 @@ function isDesktopInFront(): boolean {
  *
  * This is the same technique Rainmeter uses for its "On Desktop" position.
  */
+let currentGuardTick: ((forceReapply?: boolean) => void) | null = null;
+
+/** Forces the desktop guard to re-evaluate and re-apply the proper Z-order immediately. */
+export function reapplyDesktopGuard(): void {
+  if (currentGuardTick) currentGuardTick(true);
+}
+
 export function startDesktopGuard(
   win: BrowserWindow,
   getOptions: () => DesktopGuardOptions,
@@ -304,9 +311,11 @@ export function startDesktopGuard(
     applied = want;
   };
 
-  const tick = () => {
+  const tick = (forceReapply = false) => {
     if (win.isDestroyed()) return;
     try {
+      if (forceReapply) applied = null;
+
       // Never let the widget layer stay minimized / hidden
       if (w32.IsIconic(hwnd) || !w32.IsWindowVisible(hwnd)) {
         w32.ShowWindow(hwnd, SW_SHOWNOACTIVATE);
@@ -354,8 +363,8 @@ export function startDesktopGuard(
         want = 'bottom';
       }
 
-      // Re-apply bottom whenever focus moves, because activating our own window raises it
-      if (want !== applied || want === 'bottom') {
+      // Re-apply bottom only when state changes or when focus moves
+      if (want !== applied || (want === 'bottom' && fgChanged)) {
         apply(want);
       }
     } catch (err) {
@@ -363,10 +372,12 @@ export function startDesktopGuard(
     }
   };
 
+  currentGuardTick = tick;
   tick();
-  const unhook = watchForeground(tick);
-  const timer = setInterval(tick, 120);
+  const unhook = watchForeground(() => tick());
+  const timer = setInterval(() => tick(), 120);
   return () => {
+    currentGuardTick = null;
     clearInterval(timer);
     unhook();
   };

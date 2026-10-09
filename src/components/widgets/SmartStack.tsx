@@ -42,22 +42,38 @@ export const SmartStack: React.FC<WidgetProps<SmartStackSettings>> = ({ id, size
     go(index + (e.deltaY > 0 ? 1 : -1), e.deltaY > 0 ? 'flip-up' : 'flip-down');
   };
 
-  const item = items[index % total];
-  const Comp = WIDGET_COMPONENTS[item.type];
-  const itemSettings = { ...defaultSettingsFor(item.type), ...(item.settings || {}) };
-  const itemSize = WIDGET_META[item.type].sizes.includes(size) ? size : WIDGET_META[item.type].sizes[0];
-
-  const updateItem = (patch: Record<string, any>) => {
+  const updateSpecificItem = (itemId: string, patch: Record<string, any>) => {
     if (preview) return;
     onSettings({
-      items: items.map(it => (it.id === item.id ? { ...it, settings: { ...(it.settings || {}), ...patch } } : it))
+      items: items.map(it => (it.id === itemId ? { ...it, settings: { ...(it.settings || {}), ...patch } } : it))
     });
   };
 
   return (
     <div onWheel={onWheel} className="relative w-full h-full overflow-hidden">
       <div className={`stack-card w-full h-full ${flip}`}>
-        {Comp && <Comp id={`${id}-${item.id}`} size={itemSize} settings={itemSettings} onSettings={updateItem} preview={preview} />}
+        {items.map((it, i) => {
+          const Comp = WIDGET_COMPONENTS[it.type];
+          if (!Comp) return null;
+          const isCurrent = i === (index % total);
+          const itSettings = { ...defaultSettingsFor(it.type), ...(it.settings || {}) };
+          const itSize = WIDGET_META[it.type].sizes.includes(size) ? size : WIDGET_META[it.type].sizes[0];
+          return (
+            <div
+              key={it.id}
+              className="w-full h-full"
+              style={{ display: isCurrent ? 'block' : 'none' }}
+            >
+              <Comp
+                id={`${id}-${it.id}`}
+                size={itSize}
+                settings={itSettings}
+                onSettings={patch => updateSpecificItem(it.id, patch)}
+                preview={preview}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {total > 1 && (

@@ -10,7 +10,7 @@ import {
   WIDGET_DIMENSIONS
 } from '../types/widget';
 import { WIDGET_META, defaultSettingsFor } from '../widgets/defaults';
-import { findFreeSpot, firstFreeSlot, clampToBounds, getEdgeMargin } from '../lib/layout';
+import { findFreeSpot, firstFreeSlot, clampToBounds, getEdgeMargin, rectOf } from '../lib/layout';
 
 interface ContextMenuState {
   isOpen: boolean;
@@ -88,6 +88,12 @@ const layoutOpts = (s: AppSettings) => {
   };
 };
 
+const clampWidget = (w: WidgetInstance, bounds: { width: number; height: number }, margin: number): WidgetInstance => {
+  const clamped = clampToBounds(rectOf(w), bounds, margin);
+  if (clamped.x === w.position.x && clamped.y === w.position.y) return w;
+  return { ...w, position: clamped };
+};
+
 export const useWidgetStore = create<WidgetStore>((set, get) => ({
   loaded: false,
   widgets: [],
@@ -109,9 +115,7 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
       const bounds = screenBounds();
       const grid = loadedSettings.snapToGrid ? loadedSettings.gridSize : 1;
       const margin = getEdgeMargin(bounds, grid);
-      const widgets = (config.widgets || []).map(w =>
-        w.position.x < margin ? { ...w, position: { ...w.position, x: margin } } : w
-      );
+      const widgets = (config.widgets || []).map(w => clampWidget(w, bounds, margin));
       set({
         widgets,
         settings: loadedSettings
@@ -119,15 +123,49 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
     }
     set({ loaded: true });
 
+    // Keep widgets on screen if screen resolution or scaling changes
+    window.addEventListener('resize', () => {
+      const bounds = screenBounds();
+      const currentSettings = get().settings;
+      const grid = currentSettings.snapToGrid ? currentSettings.gridSize : 1;
+      const margin = getEdgeMargin(bounds, grid);
+      set(state => ({
+        widgets: state.widgets.map(w => clampWidget(w, bounds, margin))
+      }));
+    });
+
+    // Flush any pending save before the window unloads
+    window.addEventListener('beforeunload', () => {
+      if (saveTimeout && (dirty.widgets || dirty.settings)) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+        const current = get();
+        const payload: Partial<StoredConfig> = {};
+        if (dirty.widgets) payload.widgets = current.widgets;
+        if (dirty.settings) payload.settings = current.settings;
+        dirty = { widgets: false, settings: false };
+        api.saveConfig(payload);
+      }
+    });
+
     // Another window (Settings) changed the config
     api.onConfigUpdated(cfg => {
+      // Flush pending local changes first so rapid cross-window edits aren't overwritten
+      if (saveTimeout && (dirty.widgets || dirty.settings)) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+        const current = get();
+        const payload: Partial<StoredConfig> = {};
+        if (dirty.widgets) payload.widgets = current.widgets;
+        if (dirty.settings) payload.settings = current.settings;
+        dirty = { widgets: false, settings: false };
+        api.saveConfig(payload);
+      }
       const loadedSettings = { ...DEFAULT_SETTINGS, ...(cfg.settings || {}) };
       const bounds = screenBounds();
       const grid = loadedSettings.snapToGrid ? loadedSettings.gridSize : 1;
       const margin = getEdgeMargin(bounds, grid);
-      const widgets = (cfg.widgets || []).map(w =>
-        w.position.x < margin ? { ...w, position: { ...w.position, x: margin } } : w
-      );
+      const widgets = (cfg.widgets || []).map(w => clampWidget(w, bounds, margin));
       set({
         widgets,
         settings: loadedSettings
@@ -153,12 +191,14 @@ export const useWidgetStore = create<WidgetStore>((set, get) => ({
   },
 
   updatePosition: (id, x, y) => {
+    const target = get().widgets.find(w => w.id === id);
+    if (!target) return;
     const bounds = screenBounds();
     const grid = get().settings.snapToGrid ? get().settings.gridSize : 1;
     const margin = getEdgeMargin(bounds, grid);
-    const safeX = Math.max(margin, x);
+    const clamped = clampToBounds(rectOf({ ...target, position: { x, y } }), bounds, margin);
     set(state => ({
-      widgets: state.widgets.map(w => (w.id === id ? { ...w, position: { x: safeX, y } } : w))
+      widgets: state.widgets.map(w => (w.id === id ? { ...w, position: clamped } : w))
     }));
     persist(get, { widgets: true });
   },

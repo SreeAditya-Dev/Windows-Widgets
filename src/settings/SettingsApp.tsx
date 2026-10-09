@@ -334,7 +334,7 @@ export const SettingsApp: React.FC = () => {
           <div className="flex flex-col items-center text-center pt-8">
             <img src={`${import.meta.env.BASE_URL}icon.png`} alt="" className="w-24 h-24 mb-4 drop-shadow-xl" draggable={false} />
             <div className="text-[22px] font-bold">Desktop Widgets</div>
-            <div className="text-[12px] text-ink/50 mb-5">Version 2.0 · macOS-style widgets for Windows</div>
+            <div className="text-[12px] text-ink/50 mb-5">Version 2.1.1 · macOS-style widgets for Windows</div>
             <Group>
               <Row label="Widgets on desktop">
                 <span className="text-[12.5px] text-ink/60">{widgets.length}</span>

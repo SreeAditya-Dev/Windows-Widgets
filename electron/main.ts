@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { pathToFileURL } from 'url';
-import { pinWindowToDesktop, startDesktopGuard, setWindowActivatable, lowerWindowToBottom } from './win32';
+import { pinWindowToDesktop, startDesktopGuard, setWindowActivatable, lowerWindowToBottom, reapplyDesktopGuard } from './win32';
 import { ConfigStore } from './store';
 import { setupTray, refreshTray, TrayActions } from './tray';
 import type { StoredConfig, AppSettings } from '../src/types/widget';
@@ -392,7 +392,7 @@ app.whenReady().then(() => {
   screen.on('display-metrics-changed', () => {
     if (!widgetWindow) return;
     widgetWindow.setBounds(screen.getPrimaryDisplay().workArea);
-    pinWindowToDesktop(widgetWindow);
+    reapplyDesktopGuard();
   });
 });
 

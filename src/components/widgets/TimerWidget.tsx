@@ -32,6 +32,11 @@ function playChime(volume = 0.8) {
     playTone(784, 0, 0.4);
     playTone(1046.5, 0.12, 0.5);
     playTone(1318.5, 0.25, 0.8);
+
+    // Close the audio context once playback finishes to prevent leaking audio connections
+    setTimeout(() => {
+      ctx.close().catch(() => {});
+    }, 1200);
   } catch (e) {
     console.warn('[Timer] WebAudio chime error:', e);
   }
@@ -43,6 +48,15 @@ export const TimerWidget: React.FC<WidgetProps<TimerSettings>> = ({ size, settin
   const [remainingSeconds, setRemainingSeconds] = useState(initialSeconds);
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+
+  // Synchronize when "Default duration" changes in Settings while idle
+  useEffect(() => {
+    const dur = settings?.defaultDurationSeconds || 300;
+    if (!isRunning && !isFinished) {
+      setTotalSeconds(dur);
+      setRemainingSeconds(dur);
+    }
+  }, [settings?.defaultDurationSeconds, isRunning, isFinished]);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
