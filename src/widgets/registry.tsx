@@ -15,6 +15,7 @@ import { WeatherWidget } from '../components/widgets/WeatherWidget';
 import { SystemWidget } from '../components/widgets/SystemWidget';
 import { BatteryWidget } from '../components/widgets/BatteryWidget';
 import { PhotosWidget } from '../components/widgets/PhotosWidget';
+import { PhotoStackWidget } from '../components/widgets/PhotoStackWidget';
 import { SmartStack } from '../components/widgets/SmartStack';
 
 export const WIDGET_COMPONENTS: Record<WidgetType, React.FC<WidgetProps<any>>> = {
@@ -32,6 +33,7 @@ export const WIDGET_COMPONENTS: Record<WidgetType, React.FC<WidgetProps<any>>> =
   system: SystemWidget,
   battery: BatteryWidget,
   photos: PhotosWidget,
+  'photo-stack': PhotoStackWidget,
   'smart-stack': SmartStack
 };
 
@@ -50,5 +52,6 @@ export const WIDGET_ICONS: Record<WidgetType, string> = {
   system: '📊',
   battery: '🔋',
   photos: '🖼️',
+  'photo-stack': '🃏',
   'smart-stack': '🗂️'
 };

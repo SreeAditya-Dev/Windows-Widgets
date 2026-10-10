@@ -82,11 +82,11 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({ widget, scheme
           cursor: isDragging ? 'grabbing' : undefined,
           touchAction: 'none'
         }}
-        className={`widget-shell ${surfaceClass} ${isDragging ? 'is-dragging' : 'z-10'} ${entering ? 'is-entering' : ''} ${meta.fullBleed ? 'full-bleed' : ''} ${
+        className={`widget-shell ${surfaceClass} ${isDragging ? 'is-dragging' : 'z-10'} ${entering ? 'is-entering' : ''} ${meta.fullBleed ? 'full-bleed' : ''} ${meta.bare ? 'bare' : ''} ${
           editMode ? 'edit-mode' : ''
         }`}
       >
-        <div className={`widget-clip ${surfaceClass} ${meta.fullBleed ? 'full-bleed' : ''}`}>
+        <div className={`widget-clip ${surfaceClass} ${meta.fullBleed ? 'full-bleed' : ''} ${meta.bare ? 'bare' : ''}`}>
           {!meta.fullBleed && <div className="widget-bg" style={{ opacity }} />}
           <Comp id={widget.id} size={size} settings={settings} onSettings={onSettings} />
         </div>

@@ -4,6 +4,7 @@ export type WidgetType =
   | 'calendar'
   | 'date'
   | 'photos'
+  | 'photo-stack'
   | 'timer'
   | 'smart-stack'
   | 'system'
@@ -35,6 +36,17 @@ export interface PhotosSettings {
   /** Where customImages came from: a whole folder or a single photo */
   source?: 'folder' | 'photo';
   /** Folder name or photo name shown on the widget */
+  sourceLabel?: string;
+}
+
+export interface PhotoStackSettings {
+  layout: 'fan' | 'cascade' | 'deck' | 'pile';
+  /** White print-style border around each photo */
+  frame: boolean;
+  autoplay: boolean;
+  autoplayIntervalSeconds: number;
+  customImages?: string[];
+  source?: 'folder' | 'photo';
   sourceLabel?: string;
 }
 

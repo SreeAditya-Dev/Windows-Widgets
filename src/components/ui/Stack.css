@@ -1,0 +1,50 @@
+.rb-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.rb-stack:focus-visible .rb-stack-card[data-top] .rb-stack-card-face {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+.rb-stack-card {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rb-stack-card-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.rb-stack-card-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.rb-stack-card-content img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.rb-stack-card-shade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+}

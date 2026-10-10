@@ -259,6 +259,59 @@ export const WidgetEditor: React.FC<{ widget: WidgetInstance; style: string }> =
         </Group>
       )}
 
+      {widget.type === 'photo-stack' && (
+        <Group title="Photo Stack" footer="Click the top photo to flip to the next one. Drag anywhere on the stack to move it.">
+          <Row label="Show" hint={photoSourceHint(s)}>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                onClick={async () => {
+                  const patch = await choosePhotos('photo');
+                  if (patch) set(patch);
+                }}
+              >
+                One Photo…
+              </Button>
+              <Button
+                onClick={async () => {
+                  const patch = await choosePhotos('folder');
+                  if (patch) set(patch);
+                }}
+              >
+                Folder…
+              </Button>
+            </div>
+          </Row>
+          {!!s.customImages?.length && (
+            <Row label="Go back to the sample photos">
+              <Button onClick={() => set({ customImages: [], source: undefined, sourceLabel: undefined })}>Use Samples</Button>
+            </Row>
+          )}
+          <Row label="Layout">
+            <Segmented
+              value={s.layout}
+              options={[
+                { value: 'fan', label: 'Fan' },
+                { value: 'cascade', label: 'Cascade' },
+                { value: 'deck', label: 'Deck' },
+                { value: 'pile', label: 'Pile' }
+              ]}
+              onChange={v => set({ layout: v })}
+            />
+          </Row>
+          <Row label="Photo border" hint="A white edge like a printed photo.">
+            <Switch on={!!s.frame} onChange={v => set({ frame: v })} />
+          </Row>
+          <Row label="Shuffle automatically">
+            <Switch on={!!s.autoplay} onChange={v => set({ autoplay: v })} />
+          </Row>
+          {s.autoplay && (
+            <Row label="Shuffle every">
+              <Slider value={s.autoplayIntervalSeconds} min={3} max={60} step={1} onChange={v => set({ autoplayIntervalSeconds: v })} format={v => `${v}s`} />
+            </Row>
+          )}
+        </Group>
+      )}
+
       {widget.type === 'smart-stack' && (
         <Group title="Smart Stack" footer="Scroll over the stack on your desktop to flip between widgets.">
           <Row label="Keep these widgets separate instead" hint="Puts every widget in this stack on the desktop on its own.">

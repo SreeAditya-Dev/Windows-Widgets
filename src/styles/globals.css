@@ -123,6 +123,16 @@
 .widget-clip.full-bleed::after {
   box-shadow: none;
 }
+/* Bare widgets (Photo Stack): no surface, nothing clipped — cards sit on the desktop and can fly
+   past the edges. A dashed outline only in edit mode shows where the widget is. */
+.widget-clip.bare {
+  overflow: visible;
+  clip-path: none;
+}
+.widget-shell.bare.edit-mode .widget-clip {
+  outline: 1.5px dashed rgb(var(--ink) / 0.3);
+  outline-offset: -1px;
+}
 .scheme-light .widget-clip::after,
 .widget-clip.scheme-light::after {
   box-shadow:

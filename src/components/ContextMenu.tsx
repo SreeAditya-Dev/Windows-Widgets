@@ -104,7 +104,7 @@ export const ContextMenu: React.FC = () => {
         </>
       )}
 
-      {widget.type === 'photos' && (
+      {(widget.type === 'photos' || widget.type === 'photo-stack') && (
         <>
           <Item
             icon={<ImageIcon size={13} />}

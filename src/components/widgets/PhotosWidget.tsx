@@ -4,7 +4,7 @@ import { WidgetProps, choosePhotos } from '../../widgets/shared';
 import { Image as ImageIcon, FolderOpen } from 'lucide-react';
 
 // Built-in curated high-res scenic photos inspired by Apple macOS Sonoma / Sequoia wallpapers
-const DEFAULT_CURATED_PHOTOS = [
+export const DEFAULT_CURATED_PHOTOS = [
   {
     url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
     title: 'Yosemite Valley',

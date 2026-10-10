@@ -11,6 +11,8 @@ export interface WidgetMeta {
   tint: string;
   /** Widget paints its own full-bleed background (photos, weather) */
   fullBleed?: boolean;
+  /** No surface at all: content sits straight on the desktop and may overflow the widget bounds */
+  bare?: boolean;
 }
 
 export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
@@ -142,6 +144,17 @@ export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
     tint: '#B7C4D6',
     fullBleed: true
   },
+  'photo-stack': {
+    type: 'photo-stack',
+    title: 'Photo Stack',
+    description: 'A pile of photos you can flick through — drag the top one away to see the next.',
+    category: 'Photos',
+    sizes: ['small', 'large'],
+    defaultSize: 'small',
+    tint: '#FFB36B',
+    fullBleed: true,
+    bare: true
+  },
   'smart-stack': {
     type: 'smart-stack',
     title: 'Smart Stack',
@@ -168,6 +181,7 @@ export const WIDGET_ORDER: WidgetType[] = [
   'stopwatch',
   'calculator',
   'photos',
+  'photo-stack',
   'smart-stack'
 ];
 
@@ -181,6 +195,8 @@ export function defaultSettingsFor(type: WidgetType): Record<string, any> {
       return { firstDayOfWeek: 1 };
     case 'photos':
       return { cycleIntervalSeconds: 15, effect: 'ken-burns' };
+    case 'photo-stack':
+      return { layout: 'deck', frame: false, autoplay: false, autoplayIntervalSeconds: 8 };
     case 'timer':
       return { defaultDurationSeconds: 300, soundEnabled: true, soundVolume: 0.8 };
     case 'analog-clock':

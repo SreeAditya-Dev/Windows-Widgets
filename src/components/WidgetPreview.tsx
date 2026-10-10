@@ -34,7 +34,7 @@ export const WidgetPreview: React.FC<{
           ['--tint' as any]: tint || meta.tint
         }}
       >
-        <div className={`widget-clip ${cls} ${meta.fullBleed ? 'full-bleed' : ''}`}>
+        <div className={`widget-clip ${cls} ${meta.fullBleed ? 'full-bleed' : ''} ${meta.bare ? 'bare' : ''}`}>
           {!meta.fullBleed && <div className="widget-bg" style={{ opacity: Math.max(opacity, 0.85) }} />}
           <Comp id={`preview-${type}-${size}`} size={size} settings={{ ...defaultSettingsFor(type), ...(settings || {}) }} onSettings={noop} preview />
         </div>
