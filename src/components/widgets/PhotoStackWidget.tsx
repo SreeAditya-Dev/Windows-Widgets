@@ -52,6 +52,8 @@ export const PhotoStackWidget: React.FC<WidgetProps<PhotoStackSettings>> = ({ si
           );
         })}
         layout={settings?.layout || 'deck'}
+        visible={3}
+        spread={0.5}
         radius={radius}
         frame={settings?.frame ? (large ? 7 : 5) : 0}
         // Dragging anywhere moves the widget like every other widget; a click flips to the next photo

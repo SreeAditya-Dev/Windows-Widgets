@@ -240,6 +240,8 @@ export interface DesktopGuardOptions {
 
 const DESKTOP_CLASSES = new Set(['WorkerW', 'Progman']);
 const MENU_CLASSES = new Set(['#32768']);
+/** Standard Windows dialog class – used by the open-file / pick-folder dialogs */
+const DIALOG_CLASS = '#32770';
 
 const cloakBuf = Buffer.alloc(4);
 function isCloaked(hwnd: number): boolean {
@@ -298,12 +300,18 @@ export function startDesktopGuard(
   const w32 = api;
   const hwnd = getHwnd(win);
   ownHwnd = hwnd;
-  let applied: 'top' | 'bottom' | null = null;
+  type Placement = 'top' | 'bottom' | 'under-dialog';
+  let applied: Placement | null = null;
   let lastForeground = -1;
 
-  const apply = (want: 'top' | 'bottom') => {
+  const apply = (want: Placement, fg: number) => {
     if (want === 'top') {
       w32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS | SWP_SHOWWINDOW);
+    } else if (want === 'under-dialog') {
+      // Drop TOPMOST and slot the layer directly beneath the dialog: the dialog is in front,
+      // while the widgets stay visible above whatever was behind them
+      w32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_FLAGS);
+      w32.SetWindowPos(hwnd, fg, 0, 0, 0, 0, SWP_FLAGS);
     } else {
       if (applied !== 'bottom') w32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_FLAGS);
       w32.SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_FLAGS);
@@ -330,6 +338,8 @@ export function startDesktopGuard(
       const isDesktop = DESKTOP_CLASSES.has(fgClass);
       const isShell = MENU_CLASSES.has(fgClass) || isShellWindow(fg);
       const isApp = !!fg && fg !== hwnd && !isDesktop && !isShell && !isOwnProcessWindow(fg);
+      // Our own photo picker: it counts as a shell window above, but must never end up behind the layer
+      const isOwnDialog = fgClass === DIALOG_CLASS && fg !== hwnd && isOwnProcessWindow(fg);
 
       // Switching to another app ends widget editing (like macOS), so the overlay
       // can never leave the widget layer floating above that app
@@ -340,15 +350,19 @@ export function startDesktopGuard(
 
       // Focus is on our own layer or a shell surface (taskbar, tray, menu): stay raised only
       // while Show Desktop is still in effect, so the layer can never sit over an app window
-      const stayRaised = () => (applied === 'top' && opts.showOnDesktop && isDesktopInFront() ? 'top' : 'bottom');
+      const raised = applied === 'top' || applied === 'under-dialog';
+      const stayRaised = () => (raised && opts.showOnDesktop && isDesktopInFront() ? 'top' : 'bottom');
 
-      let want: 'top' | 'bottom';
+      let want: Placement;
       if (opts.overlay) {
         // Gallery / edit mode / menu is open – it must be visible to be usable
         want = 'top';
       } else if (opts.isSettingsOpen) {
         // While the Settings window is open, widgets must stay on the desktop layer behind it
         want = 'bottom';
+      } else if (isOwnDialog && (opts.alwaysOnTop || stayRaised() === 'top')) {
+        // The layer would sit over the photo picker – tuck it just beneath instead
+        want = 'under-dialog';
       } else if (opts.alwaysOnTop) {
         want = 'top';
       } else if (fg === hwnd) {
@@ -364,8 +378,8 @@ export function startDesktopGuard(
       }
 
       // Re-apply bottom only when state changes or when focus moves
-      if (want !== applied || (want === 'bottom' && fgChanged)) {
-        apply(want);
+      if (want !== applied || (want !== 'top' && fgChanged)) {
+        apply(want, fg);
       }
     } catch (err) {
       console.error('[Win32] desktop guard tick failed:', err);
